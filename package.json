@@ -1,0 +1,20 @@
+{
+  "name": "dev-tinder",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Tinder for devs",
+  "keywords": [
+    "nodejs",
+    "javascript"
+  ],
+  "author": "Shikhar_skj",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "nodemon": "^3.1.14"
+  }
+}
