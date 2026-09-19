@@ -1,83 +1,13 @@
 import express from "express";
 import connectDB from "./config/database.js";
 import User from "./models/user.js";
-import mongoose from "mongoose";
+import { isValidUserId, sanitizeUserData } from "../utils/validation.js";
+import { SIGNUP_FIELDS, UPDATE_FIELDS } from "../constants.js";
+import bcrypt from "bcrypt";
 
 const app = express();
 // express.json() middleware is used to parse incoming JSON requests and make the data available in req.body
 app.use(express.json());
-
-const SIGNUP_FIELDS = [
-  "firstName",
-  "lastName",
-  "email",
-  "password",
-  "age",
-  "gender",
-  "location",
-  "photoUrl",
-  "bio",
-  "interests",
-  "skills",
-];
-
-const UPDATE_FIELDS = [
-  "password",
-  "age",
-  "gender",
-  "location",
-  "photoUrl",
-  "bio",
-  "interests",
-  "skills",
-];
-
-const isPlainObject = (value) =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
-
-const isValidUserId = (userId) => mongoose.Types.ObjectId.isValid(userId);
-
-const sanitizeUserData = (data, allowedFields) => {
-  if (!isPlainObject(data)) return null;
-
-  const keys = Object.keys(data);
-  if (keys.some((key) => !allowedFields.includes(key))) return null;
-
-  const sanitizedData = {};
-  for (const key of keys) {
-    const value = data[key];
-
-    if (key === "age") {
-      if (!Number.isInteger(value) || value < 18 || value > 50) return null;
-      sanitizedData[key] = value;
-      continue;
-    }
-
-    if (["interests", "skills"].includes(key)) {
-      if (
-        !Array.isArray(value) ||
-        value.length > (key === "skills" ? 5 : 20) ||
-        value.some(
-          (item) => typeof item !== "string" || item.trim().length > 50,
-        )
-      ) {
-        return null;
-      }
-      sanitizedData[key] = value.map((item) => item.trim());
-      continue;
-    }
-
-    if (typeof value !== "string" || value.trim().length === 0) return null;
-    const sanitizedValue = value.trim();
-    if (key === "password" && sanitizedValue.length < 8) return null;
-    const maxLength = key === "password" ? 128 : key === "bio" ? 1000 : 100;
-    if (sanitizedValue.length > maxLength) return null;
-    sanitizedData[key] =
-      key === "email" ? sanitizedValue.toLowerCase() : sanitizedValue;
-  }
-
-  return sanitizedData;
-};
 
 app.post("/api/signup", async (req, res) => {
   const signupData = sanitizeUserData(req.body, SIGNUP_FIELDS);
@@ -98,6 +28,9 @@ app.post("/api/signup", async (req, res) => {
     return res.status(400).json({ error: "Invalid signup data!" });
   }
 
+  const hashedPassword = await bcrypt.hash(signupData.password, 10);
+  signupData.password = hashedPassword;
+
   const user = new User(signupData);
 
   try {
@@ -108,6 +41,37 @@ app.post("/api/signup", async (req, res) => {
   } catch (error) {
     console.error("Error creating user:", error);
     res.status(500).send("Error creating user. Please try again later.");
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ error: "Email and password are required!" });
+  }
+
+  try {
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    }).select("+password");
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ error: "Email not registered! Please sign up first." });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Invalid email or password!" });
+    }
+
+    res.status(200).json({ message: "Login successful!" });
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).send("Error during login. Please try again later.");
   }
 });
 
