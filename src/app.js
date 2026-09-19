@@ -1,13 +1,104 @@
 import express from "express";
 import connectDB from "./config/database.js";
 import User from "./models/user.js";
+import mongoose from "mongoose";
 
 const app = express();
 // express.json() middleware is used to parse incoming JSON requests and make the data available in req.body
 app.use(express.json());
 
+const SIGNUP_FIELDS = [
+  "firstName",
+  "lastName",
+  "email",
+  "password",
+  "age",
+  "gender",
+  "location",
+  "photoUrl",
+  "bio",
+  "interests",
+  "skills",
+];
+
+const UPDATE_FIELDS = [
+  "password",
+  "age",
+  "gender",
+  "location",
+  "photoUrl",
+  "bio",
+  "interests",
+  "skills",
+];
+
+const isPlainObject = (value) =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+const isValidUserId = (userId) => mongoose.Types.ObjectId.isValid(userId);
+
+const sanitizeUserData = (data, allowedFields) => {
+  if (!isPlainObject(data)) return null;
+
+  const keys = Object.keys(data);
+  if (keys.some((key) => !allowedFields.includes(key))) return null;
+
+  const sanitizedData = {};
+  for (const key of keys) {
+    const value = data[key];
+
+    if (key === "age") {
+      if (!Number.isInteger(value) || value < 18 || value > 50) return null;
+      sanitizedData[key] = value;
+      continue;
+    }
+
+    if (["interests", "skills"].includes(key)) {
+      if (
+        !Array.isArray(value) ||
+        value.length > (key === "skills" ? 5 : 20) ||
+        value.some(
+          (item) => typeof item !== "string" || item.trim().length > 50,
+        )
+      ) {
+        return null;
+      }
+      sanitizedData[key] = value.map((item) => item.trim());
+      continue;
+    }
+
+    if (typeof value !== "string" || value.trim().length === 0) return null;
+    const sanitizedValue = value.trim();
+    if (key === "password" && sanitizedValue.length < 8) return null;
+    const maxLength = key === "password" ? 128 : key === "bio" ? 1000 : 100;
+    if (sanitizedValue.length > maxLength) return null;
+    sanitizedData[key] =
+      key === "email" ? sanitizedValue.toLowerCase() : sanitizedValue;
+  }
+
+  return sanitizedData;
+};
+
 app.post("/api/signup", async (req, res) => {
-  const user = new User(req.body);
+  const signupData = sanitizeUserData(req.body, SIGNUP_FIELDS);
+  const requiredFields = [
+    "firstName",
+    "lastName",
+    "email",
+    "password",
+    "age",
+    "gender",
+    "location",
+  ];
+
+  if (
+    !signupData ||
+    requiredFields.some((field) => signupData[field] === undefined)
+  ) {
+    return res.status(400).json({ error: "Invalid signup data!" });
+  }
+
+  const user = new User(signupData);
 
   try {
     await user.save();
@@ -21,9 +112,17 @@ app.post("/api/signup", async (req, res) => {
 });
 
 app.get("/api/user", async (req, res) => {
+  const userEmail =
+    typeof req.body?.email === "string"
+      ? req.body.email.trim().toLowerCase()
+      : "";
+
+  if (!userEmail || userEmail.length > 254) {
+    return res.status(400).json({ error: "A valid email is required!" });
+  }
+
   try {
-    const userEmail = req.body.email;
-    const user = await User.findOne({ email: userEmail });
+    const user = await User.findOne({ email: userEmail }).select("-password");
 
     if (!user) {
       res.status(404).send(`No user found with email ${userEmail}`);
@@ -37,14 +136,24 @@ app.get("/api/user", async (req, res) => {
   }
 });
 
-app.patch("/api/user", async (req, res) => {
+app.patch("/api/user/:id", async (req, res) => {
+  const userId = req.params?.id;
+
+  if (!isValidUserId(userId)) {
+    return res.status(400).json({ error: "Invalid user ID!" });
+  }
+
   try {
-    const userId = req.body.id;
-    const updatedData = req.body.data;
+    const updatedData = sanitizeUserData(req.body?.data, UPDATE_FIELDS);
+
+    if (!updatedData || Object.keys(updatedData).length === 0) {
+      return res.status(400).json({ error: "Invalid updates!" });
+    }
 
     const updatedUser = await User.findByIdAndUpdate(userId, updatedData, {
       new: true,
-    });
+      runValidators: true,
+    }).select("-password");
 
     if (!updatedUser) {
       res.status(404).send(`No user found with ID ${userId}`);
@@ -59,8 +168,13 @@ app.patch("/api/user", async (req, res) => {
 });
 
 app.delete("/api/user", async (req, res) => {
+  const userId = req.body?.id;
+
+  if (typeof userId !== "string" || !isValidUserId(userId)) {
+    return res.status(400).json({ error: "Invalid user ID!" });
+  }
+
   try {
-    const userId = req.body.id;
     const deletedUser = await User.findByIdAndDelete(userId);
 
     if (!deletedUser) {
