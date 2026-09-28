@@ -1,8 +1,11 @@
 import mongoose from "mongoose";
 import validator from "validator";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const urlRegex = /^https?:\/\/\S+$/i;
+const bcryptHashRegex = /^\$2[aby]\$\d{2}\$/;
 
 const userSchema = new mongoose.Schema(
   {
@@ -23,7 +26,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true, // mongodb automatically creates a unique index for this field
       lowercase: true,
       trim: true,
       maxlength: 254,
@@ -37,21 +40,19 @@ const userSchema = new mongoose.Schema(
       select: false,
       validate: {
         validator: function (value) {
-          if (
-            this.isModified("password") &&
-            !validator.isStrongPassword(value, {
+          return (
+            bcryptHashRegex.test(value) ||
+            validator.isStrongPassword(value, {
               minLength: 8,
               minLowercase: 1,
               minUppercase: 1,
               minNumbers: 1,
               minSymbols: 1,
             })
-          ) {
-            throw new Error(
-              "Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one symbol.",
-            );
-          }
+          );
         },
+        message:
+          "Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one symbol.",
       },
     },
     age: {
@@ -69,6 +70,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
       enum: ["Male", "Female", "Other"],
+      message: "Gender must be either 'Male', 'Female', or 'Other'",
     },
     location: {
       type: String,
@@ -127,11 +129,42 @@ const userSchema = new mongoose.Schema(
         },
       ],
     },
+    // connectionRequests: [
+    //   {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: "User",
+    //   },
+    // ],
   },
   {
     timestamps: true,
   },
 );
+
+userSchema.pre("save", async function () {
+  if (!this.isModified("password") || bcryptHashRegex.test(this.password)) {
+    return;
+  }
+
+  this.password = await bcrypt.hash(this.password, 10);
+});
+
+userSchema.methods.getJWT = function () {
+  const user = this;
+
+  return jwt.sign({ userId: user._id.toString() }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+    issuer: "dev-tinder",
+    audience: "dev-tinder-client",
+  });
+};
+
+userSchema.methods.validatePassword = async function (passwordInputByUser) {
+  const user = this;
+  const passwordHash = user.password;
+
+  return bcrypt.compare(passwordInputByUser, passwordHash);
+};
 
 const User = mongoose.model("User", userSchema);
 
