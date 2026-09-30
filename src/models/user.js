@@ -129,12 +129,6 @@ const userSchema = new mongoose.Schema(
         },
       ],
     },
-    // connectionRequests: [
-    //   {
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: "User",
-    //   },
-    // ],
   },
   {
     timestamps: true,

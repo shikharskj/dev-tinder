@@ -5,7 +5,8 @@ import { isValidUserId } from "../../utils/validation.js";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
 
-const allowedStatuses = ["ignored", "interested"];
+const sendConnectionRequestAllowedStatuses = ["ignored", "interested"];
+const reviewConnectionRequestAllowedStatuses = ["accepted", "rejected"];
 
 const requestRouter = express.Router();
 
@@ -20,7 +21,7 @@ requestRouter.post(
       return sendError(res, 400, "Invalid target user ID!");
     }
 
-    if (!allowedStatuses.includes(status)) {
+    if (!sendConnectionRequestAllowedStatuses.includes(status)) {
       return sendError(res, 400, "Invalid request status!");
     }
 
@@ -64,6 +65,52 @@ requestRouter.post(
     } catch (error) {
       console.error("Error sending request:", error);
       return sendError(res, 500, "Error sending request.");
+    }
+  },
+);
+
+requestRouter.post(
+  "/api/request/review/:status/:requestId",
+  authenticateUser,
+  async (req, res) => {
+    const { requestId, status } = req.params;
+    const loggedInUserId = req.user._id;
+
+    if (!reviewConnectionRequestAllowedStatuses.includes(status)) {
+      return sendError(res, 400, "Invalid request status!");
+    }
+
+    if (!isValidUserId(requestId)) {
+      return sendError(res, 400, "Invalid request ID!");
+    }
+
+    try {
+      const updatedRequest = await ConnectionRequest.findOneAndUpdate(
+        {
+          _id: requestId,
+          toUserId: loggedInUserId,
+          status: "interested",
+        },
+        { $set: { status } },
+        { new: true, runValidators: true },
+      );
+
+      if (!updatedRequest) {
+        return sendError(
+          res,
+          404,
+          "Connection request not found or already reviewed.",
+        );
+      }
+
+      return sendSuccess(
+        res,
+        200,
+        `Connection request has been ${status} successfully!`,
+        updatedRequest,
+      );
+    } catch (error) {
+      return sendError(res, 500, "Error reviewing request.");
     }
   },
 );

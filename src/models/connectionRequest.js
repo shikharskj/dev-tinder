@@ -4,7 +4,7 @@ const connectionRequestSchema = new mongoose.Schema(
   {
     fromUserId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "User", // reference to the User collection
       required: true,
     },
     toUserId: {
@@ -25,14 +25,15 @@ const connectionRequestSchema = new mongoose.Schema(
   },
 );
 
-connectionRequestSchema.pre("save", async function (next) {
+connectionRequestSchema.index({ fromUserId: 1 });
+connectionRequestSchema.index({ toUserId: 1 });
+
+connectionRequestSchema.pre("save", async function () {
   const connectionRequest = this;
 
   if (connectionRequest.fromUserId.equals(connectionRequest.toUserId)) {
     throw new Error("Cannot send a connection request to yourself.");
   }
-
-  next();
 });
 
 const ConnectionRequest = mongoose.model(
