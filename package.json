@@ -1,26 +1,15 @@
 {
   "name": "dev-tinder",
-  "version": "1.0.0",
-  "type": "module",
-  "description": "Tinder for devs",
-  "keywords": [
-    "nodejs",
-    "javascript"
-  ],
-  "author": "Shikhar_skj",
-  "main": "src/app.js",
+  "private": true,
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "concurrently -k -n backend,frontend -c cyan,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start:backend": "npm --prefix backend start",
+    "build:frontend": "npm --prefix frontend run build",
+    "preview:frontend": "npm --prefix frontend run preview"
   },
-  "dependencies": {
-    "bcrypt": "^6.0.0",
-    "cookie-parser": "^1.4.7",
-    "dotenv": "^18.0.3",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.10.0",
-    "nodemon": "^3.1.14",
-    "validator": "^13.15.35"
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
