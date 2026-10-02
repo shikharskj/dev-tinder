@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import connectDB from "./config/database.js";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.js";
@@ -7,7 +8,11 @@ import profileRouter from "./routes/profile.js";
 import requestRouter from "./routes/request.js";
 import userRouter from "./routes/user.js";
 
-const app = express();
+const app = express({
+  origin: "http://localhost:5174",
+  credentials: true,
+});
+app.use(cors());
 app.use(cookieParser());
 // express.json() middleware is used to parse incoming JSON requests and make the data available in req.body
 app.use(express.json());

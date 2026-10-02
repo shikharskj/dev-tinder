@@ -56,7 +56,7 @@ export const validateProfileData = (data) => {
     }
   }
 
-  if (Object.hasOwn(data, "photoUrl")) {
+  if (Object.hasOwn(data, "photoUrl") && data.photoUrl !== null) {
     if (
       typeof data.photoUrl !== "string" ||
       !urlRegex.test(data.photoUrl.trim())

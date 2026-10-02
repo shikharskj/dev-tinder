@@ -1,54 +1,80 @@
-import { useState } from "react";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Layout from "./Layout/Layout";
+import SignUp from "./pages/SignUp";
+import Profile from "./pages/Profile";
+import Feed from "./pages/Feed";
+import Requests from "./pages/Requests";
+import Connections from "./pages/Connections";
+import NotFound from "./pages/NotFound";
+import { GuestOnly, RequireAuth } from "./RouteGuards";
+import { AuthProvider } from "./AuthContext";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <Home /> },
+      {
+        path: "login",
+        element: (
+          <GuestOnly>
+            <Login />
+          </GuestOnly>
+        ),
+      },
+      {
+        path: "sign-up",
+        element: (
+          <GuestOnly>
+            <SignUp />
+          </GuestOnly>
+        ),
+      },
+      {
+        path: "feed",
+        element: (
+          <RequireAuth>
+            <Feed />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "profile",
+        element: (
+          <RequireAuth>
+            <Profile />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "requests",
+        element: (
+          <RequireAuth>
+            <Requests />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "connections",
+        element: (
+          <RequireAuth>
+            <Connections />
+          </RequireAuth>
+        ),
+      },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+]);
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <>
-      <div className="navbar bg-base-100 shadow-sm">
-        <div className="flex-1">
-          <a className="btn btn-ghost text-xl">DevTinder</a>
-        </div>
-        <div className="flex gap-2">
-          <input 
-            type="text"
-            placeholder="Search"
-            className="input w-24 md:w-auto"
-          />
-          <div className="dropdown dropdown-end">
-            <div
-              tabIndex={0}
-              role="button"
-              className="btn btn-ghost btn-circle avatar"
-            >
-              <div className="w-10 rounded-full">
-                <img
-                  alt="Tailwind CSS Navbar component"
-                  src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
-                />
-              </div>
-            </div>
-            <ul
-              tabIndex={-1}
-              className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow"
-            >
-              <li>
-                <a className="justify-between">
-                  Profile
-                  <span className="badge">New</span>
-                </a>
-              </li>
-              <li>
-                <a>Settings</a>
-              </li>
-              <li>
-                <a>Logout</a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   );
 }
 

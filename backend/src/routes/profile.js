@@ -43,22 +43,31 @@ profileRouter.patch("/api/profile/edit", authenticateUser, async (req, res) => {
       location,
       bio,
     };
+    const clearPhoto = photoUrl === null;
 
     const updateFields = Object.fromEntries(
-      Object.entries(editableFields).filter(([, value]) => value !== undefined),
+      Object.entries(editableFields).filter(
+        ([field, value]) =>
+          value !== undefined && !(field === "photoUrl" && value === null),
+      ),
     );
 
-    const sanitizedFields = validateProfileData(updateFields);
+    const sanitizedFields = validateProfileData({
+      ...updateFields,
+      ...(clearPhoto ? { photoUrl: null } : {}),
+    });
 
     if (sanitizedFields) {
       return sendError(res, 400, "Invalid profile data.", sanitizedFields);
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      user._id,
-      { $set: updateFields },
-      { new: true, runValidators: true },
-    ).select("-password");
+    const update = { $set: updateFields };
+    if (clearPhoto) update.$unset = { photoUrl: 1 };
+
+    const updatedUser = await User.findByIdAndUpdate(user._id, update, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
 
     if (!updatedUser) {
       return sendError(res, 404, "User not found.");
