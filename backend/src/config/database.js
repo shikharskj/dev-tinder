@@ -1,5 +1,5 @@
 const uri =
-  "mongodb+srv://shikharnitsri_db_user:Sethrollins1@nodejs-practice.jar12sr.mongodb.net/devTinder";
+  "mongodb+srv://shikharnitsri_db_user:qFOkVH6LejxVNkVu@nodejs-practice.jar12sr.mongodb.net/devTinder";
 
 import mongoose from "mongoose";
 
