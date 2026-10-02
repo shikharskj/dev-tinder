@@ -9,7 +9,7 @@ import ConnectionRequest from "../models/connectionRequest.js";
 
 const userRouter = express.Router();
 
-// userRouter.get("/api/user", async (req, res) => {
+// userRouter.get("/user", async (req, res) => {
 //   const userEmail =
 //     typeof req.query.email === "string"
 //       ? req.query.email.trim().toLowerCase()
@@ -35,7 +35,7 @@ const userRouter = express.Router();
 //   }
 // });
 
-// userRouter.patch("/api/user/:id", authenticateUser, async (req, res) => {
+// userRouter.patch("/user/:id", authenticateUser, async (req, res) => {
 //   const userId = req.params?.id;
 
 //   if (!isValidUserId(userId)) {
@@ -73,7 +73,7 @@ const userRouter = express.Router();
 //   }
 // });
 
-// userRouter.delete("/api/user", authenticateUser, async (req, res) => {
+// userRouter.delete("/user", authenticateUser, async (req, res) => {
 //   const userId = req.body?.id;
 
 //   if (typeof userId !== "string" || !isValidUserId(userId)) {
@@ -98,7 +98,7 @@ const userRouter = express.Router();
 //   }
 // });
 
-// userRouter.get("/api/feed", async (req, res) => {
+// userRouter.get("/feed", async (req, res) => {
 //   try {
 //     const users = await User.find().select("-password -connectionRequests");
 //     return sendSuccess(res, 200, "Feed fetched successfully.", users);
@@ -109,7 +109,7 @@ const userRouter = express.Router();
 // });
 
 // Get incoming connection requests that are awaiting review.
-userRouter.get("/api/user/requests", authenticateUser, async (req, res) => {
+userRouter.get("/user/requests", authenticateUser, async (req, res) => {
   const loggedInUserId = req.user._id;
 
   try {
@@ -140,7 +140,7 @@ userRouter.get("/api/user/requests", authenticateUser, async (req, res) => {
   }
 });
 
-userRouter.get("/api/user/connections", authenticateUser, async (req, res) => {
+userRouter.get("/user/connections", authenticateUser, async (req, res) => {
   const loggedInUserId = req.user._id;
 
   try {
@@ -184,7 +184,7 @@ userRouter.get("/api/user/connections", authenticateUser, async (req, res) => {
   }
 });
 
-userRouter.get("/api/feed", authenticateUser, async (req, res) => {
+userRouter.get("/feed", authenticateUser, async (req, res) => {
   const loggedInUserId = req.user._id;
 
   const parsePositiveInteger = (value, defaultValue) => {

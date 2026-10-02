@@ -11,7 +11,7 @@ const reviewConnectionRequestAllowedStatuses = ["accepted", "rejected"];
 const requestRouter = express.Router();
 
 requestRouter.post(
-  `/api/request/send/:status/:toUserId`,
+  `/request/send/:status/:toUserId`,
   authenticateUser,
   async (req, res) => {
     const { toUserId, status } = req.params;
@@ -70,7 +70,7 @@ requestRouter.post(
 );
 
 requestRouter.post(
-  "/api/request/review/:status/:requestId",
+  "/request/review/:status/:requestId",
   authenticateUser,
   async (req, res) => {
     const { requestId, status } = req.params;

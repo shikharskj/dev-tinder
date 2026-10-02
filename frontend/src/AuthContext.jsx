@@ -10,7 +10,7 @@ export function AuthProvider({ children }) {
     let active = true;
 
     api
-      .get("/api/profile")
+      .get("/profile")
       .then(({ data }) => {
         if (active) setUser(data);
       })
@@ -27,16 +27,16 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (credentials) => {
-    const { data } = await api.post("/api/login", credentials);
+    const { data } = await api.post("/login", credentials);
     setUser(data);
     return data;
   };
 
-  const signUp = (details) => api.post("/api/signup", details);
+  const signUp = (details) => api.post("/signup", details);
 
   const logout = async () => {
     try {
-      await api.post("/api/logout");
+      await api.post("/logout");
     } finally {
       setUser(null);
     }

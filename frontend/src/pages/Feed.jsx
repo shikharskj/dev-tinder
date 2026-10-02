@@ -32,7 +32,7 @@ const Feed = () => {
     let active = true;
 
     api
-      .get(`/api/feed?page=1&limit=${PAGE_SIZE}`)
+      .get(`/feed?page=1&limit=${PAGE_SIZE}`)
       .then(({ data }) => {
         if (!active) return;
         const results = Array.isArray(data) ? data : [];
@@ -77,7 +77,7 @@ const Feed = () => {
     setError("");
 
     try {
-      await api.post(`/api/request/send/${status}/${activePerson._id}`);
+      await api.post(`/request/send/${status}/${activePerson._id}`);
       try {
         if (typeof navigator.vibrate === "function") navigator.vibrate(12);
       } catch {

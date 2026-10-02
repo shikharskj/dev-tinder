@@ -35,7 +35,7 @@ export default function Connections() {
     let active = true;
 
     api
-      .get("/api/user/connections")
+      .get("/user/connections")
       .then(({ data }) => {
         if (active) {
           setConnections(Array.isArray(data) ? data : []);

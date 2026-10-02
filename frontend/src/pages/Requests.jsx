@@ -33,7 +33,7 @@ export default function Requests() {
     let active = true;
 
     api
-      .get("/api/user/requests")
+      .get("/user/requests")
       .then(({ data }) => {
         if (active) {
           setRequests(Array.isArray(data) ? data : []);
@@ -63,7 +63,7 @@ export default function Requests() {
     setReviewErrors((current) => ({ ...current, [requestId]: undefined }));
 
     try {
-      await api.post(`/api/request/review/${status}/${requestId}`);
+      await api.post(`/request/review/${status}/${requestId}`);
       const reviewedRequest = requests.find(
         (request) => request._id === requestId,
       );

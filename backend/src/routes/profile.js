@@ -6,7 +6,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 
 const profileRouter = express.Router();
 
-profileRouter.get("/api/profile", authenticateUser, async (req, res) => {
+profileRouter.get("/profile", authenticateUser, async (req, res) => {
   try {
     const user = req.user;
 
@@ -17,7 +17,7 @@ profileRouter.get("/api/profile", authenticateUser, async (req, res) => {
   }
 });
 
-profileRouter.patch("/api/profile/edit", authenticateUser, async (req, res) => {
+profileRouter.patch("/profile/edit", authenticateUser, async (req, res) => {
   try {
     const user = req.user;
     const {

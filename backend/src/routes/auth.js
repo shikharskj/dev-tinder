@@ -6,7 +6,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 
 const authRouter = express.Router();
 
-authRouter.post("/api/signup", async (req, res) => {
+authRouter.post("/signup", async (req, res) => {
   const signupData = sanitizeUserData(req.body, SIGNUP_FIELDS);
   const requiredFields = [
     "firstName",
@@ -48,7 +48,7 @@ authRouter.post("/api/signup", async (req, res) => {
   }
 });
 
-authRouter.post("/api/login", async (req, res) => {
+authRouter.post("/login", async (req, res) => {
   if (!process.env.JWT_SECRET) {
     return sendError(res, 500, "Authentication service is not configured.");
   }
@@ -99,7 +99,7 @@ authRouter.post("/api/login", async (req, res) => {
   }
 });
 
-authRouter.post("/api/logout", (req, res) => {
+authRouter.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -110,7 +110,7 @@ authRouter.post("/api/logout", (req, res) => {
   return sendSuccess(res, 200, "Logout successful!");
 });
 
-authRouter.patch("/api/changePassword", async (req, res) => {
+authRouter.patch("/changePassword", async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
 
   if (
@@ -157,7 +157,7 @@ authRouter.patch("/api/changePassword", async (req, res) => {
   }
 });
 
-authRouter.post("/api/forgotPassword", async (req, res) => {
+authRouter.post("/forgotPassword", async (req, res) => {
   const { email } = req.body;
 
   if (typeof email !== "string" || email.length > 254) {

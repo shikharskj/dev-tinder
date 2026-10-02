@@ -104,7 +104,7 @@ const Profile = () => {
     };
 
     try {
-      const { data } = await api.patch("/api/profile/edit", updates);
+      const { data } = await api.patch("/profile/edit", updates);
       const nextForm = formFromUser(data);
       setUser(data);
       setForm(nextForm);
