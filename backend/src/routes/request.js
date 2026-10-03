@@ -5,6 +5,8 @@ import { isValidUserId } from "../../utils/validation.js";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
 
+import { run as sendEmail } from "../../utils/sendEmail.js";
+
 const sendConnectionRequestAllowedStatuses = ["ignored", "interested"];
 const reviewConnectionRequestAllowedStatuses = ["accepted", "rejected"];
 
@@ -55,6 +57,41 @@ requestRouter.post(
       });
 
       const connectionRequestData = await connectionRequest.save();
+
+      if (status === "interested") {
+        try {
+          // Temporary override for sandbox testing.
+          // Confirm the actual email field in your User schema.
+          const toAddress =
+            process.env.SES_TEST_TO || targetUser.emailId;
+      
+          if (!toAddress) {
+            throw new Error("Recipient email is missing");
+          }
+      
+          const senderName = [
+            req.user.firstName,
+            req.user.lastName,
+          ]
+            .filter(Boolean)
+            .join(" ");
+      
+            await sendEmail({
+              toAddress: process.env.SES_TEST_TO || targetUser.emailId,
+              senderName: [req.user.firstName, req.user.lastName]
+                .filter(Boolean)
+                .join(" "),
+              recipientName: targetUser.firstName,
+            });
+      
+          console.log("SES accepted email:", emailResponse.MessageId);
+        } catch (emailError) {
+          console.error("Connection saved, but notification failed:", {
+            name: emailError.name,
+            message: emailError.message,
+          });
+        }
+      }
 
       return sendSuccess(
         res,

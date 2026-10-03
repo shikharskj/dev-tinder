@@ -12,6 +12,7 @@ const app = express({
   origin: "http://localhost:5174",
   credentials: true,
 });
+
 app.use(cors());
 app.use(cookieParser());
 // express.json() middleware is used to parse incoming JSON requests and make the data available in req.body
@@ -25,8 +26,8 @@ app.use(userRouter);
 const startServer = async () => {
   await connectDB();
 
-  app.listen(7777, () => {
-    console.log("Server is running on port 7777");
+  app.listen(process.env.PORT, () => {
+    console.log(`Server is running on port ${process.env.PORT}`);
   });
 };
 

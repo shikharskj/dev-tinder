@@ -1,5 +1,4 @@
-const uri =
-  "mongodb+srv://shikharnitsri_db_user:qFOkVH6LejxVNkVu@nodejs-practice.jar12sr.mongodb.net/devTinder";
+const uri = process.env.DB_CONNECTION_STRING;
 
 import mongoose from "mongoose";
 
