@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
-import { isAfter } from "date-fns";
+import { effectiveUsagePlan } from "../utils/subscription.js";
 import User from "../models/user.js";
-import Payment from "../models/payment.js";
 import { sendError } from "../utils/response.js";
 
 const authenticateUser = async (req, res, next) => {
@@ -26,47 +25,8 @@ const authenticateUser = async (req, res, next) => {
       return sendError(res, 404, "User not found.");
     }
 
-    const now = new Date();
-    if (
-      user.usagePlan === "Elite" &&
-      user.eliteSubscriptionExpiresAt &&
-      !isAfter(user.eliteSubscriptionExpiresAt, now)
-    ) {
-      const subscriptionId = user.razorpaySubscriptionId;
-      const expiryUpdate = await User.updateOne(
-        {
-          _id: user._id,
-          usagePlan: "Elite",
-          razorpaySubscriptionId: subscriptionId,
-          eliteSubscriptionExpiresAt: { $lte: now },
-        },
-        {
-          $set: { usagePlan: "Basic" },
-          $unset: {
-            razorpaySubscriptionId: 1,
-            eliteSubscriptionExpiresAt: 1,
-          },
-        },
-      );
-      if (expiryUpdate.modifiedCount === 1) {
-        await Payment.updateOne(
-          {
-            razorpaySubscriptionId: subscriptionId,
-            subscriptionStatus: "active",
-          },
-          { $set: { subscriptionStatus: "expired", accessGranted: false } },
-        );
-        user.usagePlan = "Basic";
-        user.razorpaySubscriptionId = null;
-        user.eliteSubscriptionExpiresAt = null;
-      } else {
-        const refreshedUser = await User.findById(userId).select("-password");
-        if (refreshedUser) {
-          req.user = refreshedUser;
-          return next();
-        }
-      }
-    }
+    // Request-local access decision. Never expire the provider subscription here.
+    user.usagePlan = effectiveUsagePlan(user);
 
     req.user = user;
     return next();

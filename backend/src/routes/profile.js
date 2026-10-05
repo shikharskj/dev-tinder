@@ -1,3 +1,4 @@
+import { effectiveUsagePlan } from "../utils/subscription.js";
 import express from "express";
 import authenticateUser from "../middlewares/auth.js";
 import User from "../models/user.js";
@@ -73,6 +74,7 @@ profileRouter.patch("/profile/edit", authenticateUser, async (req, res) => {
       return sendError(res, 404, "User not found.");
     }
 
+    updatedUser.usagePlan = effectiveUsagePlan(updatedUser);
     return sendSuccess(res, 200, "Profile updated successfully.", updatedUser);
   } catch (error) {
     console.error("Error fetching profile for edit:", error);

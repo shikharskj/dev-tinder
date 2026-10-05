@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { api } from "../api.js";
+import { useAuth } from "../auth.js";
 import { USAGE_PLANS } from "../constants";
 
 let razorpayCheckoutPromise;
@@ -52,6 +53,7 @@ function formatDate(date) {
 }
 
 export default function EnrollPremium() {
+  const { setUser } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -97,12 +99,28 @@ export default function EnrollPremium() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!subscription) return;
+    if (subscription.creationStatus === "failed") idempotencyKey.current = null;
+    setUser((current) =>
+      current
+        ? {
+            ...current,
+            usagePlan: subscription.usagePlan,
+            eliteSubscriptionExpiresAt: subscription.expiresAt,
+          }
+        : current,
+    );
+  }, [subscription, setUser]);
+
   const currentPlan = subscription?.usagePlan ?? "Basic";
   const checkout = subscription?.checkout;
   const requestPending =
     subscription?.status === "created" ||
     subscription?.status === "authenticated" ||
     subscription?.status === "pending" ||
+    subscription?.status === "halted" ||
+    subscription?.status === "paused" ||
     (subscription?.status === "active" && currentPlan !== "Elite");
 
   async function confirmSubscriptionStatus() {
@@ -148,10 +166,15 @@ export default function EnrollPremium() {
           setCheckoutOpen(false);
         },
       },
-      handler: async () => {
+      handler: async (response) => {
         checkoutInstance.current = null;
         setCheckoutOpen(false);
-        await confirmSubscriptionStatus();
+        try {
+          await api.post("/payment/verify-subscription", response);
+          await confirmSubscriptionStatus();
+        } catch (verificationError) {
+          setError(verificationError.message);
+        }
       },
     });
     checkoutInstance.current = razorpay;
@@ -192,12 +215,19 @@ export default function EnrollPremium() {
       setSubscription((currentSubscription) => ({
         ...currentSubscription,
         ...data,
-        checkout: data,
+        checkout:
+          data.status === "created" && data.usagePlan !== "Elite" ? data : null,
       }));
-      await openRazorpayCheckout(data);
+      if (data.status === "created" && data.usagePlan !== "Elite") {
+        await openRazorpayCheckout(data);
+      } else {
+        await refreshSubscription();
+      }
     } catch (requestError) {
+      if (requestError.status === 502) idempotencyKey.current = null;
       if (requestError.status === 409) {
-        idempotencyKey.current = null;
+        // Refresh state; never assume every conflict permits another subscription.
+        await refreshSubscription().catch(() => {});
       }
       setError(requestError.message);
     } finally {
@@ -206,7 +236,8 @@ export default function EnrollPremium() {
   }
 
   useEffect(() => {
-    if (!requestPending || checkout || currentPlan === "Elite") return undefined;
+    if (!requestPending || checkout || currentPlan === "Elite")
+      return undefined;
 
     const interval = window.setInterval(() => {
       api
@@ -246,10 +277,7 @@ export default function EnrollPremium() {
       </section>
 
       {error && (
-        <div
-          className="premium-message premium-message--error"
-          role="alert"
-        >
+        <div className="premium-message premium-message--error" role="alert">
           <span>{error}</span>
           <button
             type="button"
@@ -405,7 +433,9 @@ export default function EnrollPremium() {
                     />
                     {confirmationPending
                       ? "Confirming your payment…"
-                      : "Checkout is awaiting payment confirmation"}
+                      : ["halted", "paused"].includes(subscription?.status)
+                        ? "Your subscription needs attention. Contact support before starting another."
+                        : "Checkout is awaiting payment confirmation"}
                   </span>
                   <button
                     type="button"
