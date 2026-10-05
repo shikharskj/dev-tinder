@@ -4,6 +4,7 @@ import User from "../models/user.js";
 import { SIGNUP_FIELDS } from "../../constants.js";
 import { sanitizeUserData } from "../utils/validation.js";
 import { sendError, sendSuccess } from "../utils/response.js";
+import { dispatchPendingEmails, enqueueEmail } from "../utils/emailNotifications.js";
 
 const authRouter = express.Router();
 
@@ -29,7 +30,19 @@ authRouter.post("/signup", async (req, res) => {
   const user = new User(signupData);
 
   try {
-    await user.save();
+    await User.db.transaction(async (session) => {
+      await user.save({ session });
+      await enqueueEmail(
+        {
+          eventKey: `welcome:${user._id}`,
+          template: "welcome",
+          toAddress: user.email,
+          data: { recipientName: user.firstName },
+        },
+        { session },
+      );
+    });
+    void dispatchPendingEmails();
     const userData = user.toObject();
     delete userData.password;
     userData.usagePlan = effectiveUsagePlan(user);

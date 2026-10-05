@@ -2,9 +2,10 @@
   "name": "dev-tinder",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n backend,frontend -c cyan,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev": "concurrently -k -n backend,frontend -c cyan,magenta \"npm:dev:backend\" \"npm:dev:frontend:ready\"",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
+    "dev:frontend:ready": "node scripts/wait-for-backend.mjs && npm run dev:frontend",
     "start:backend": "npm --prefix backend start",
     "build:frontend": "npm --prefix frontend run build",
     "preview:frontend": "npm --prefix frontend run preview"

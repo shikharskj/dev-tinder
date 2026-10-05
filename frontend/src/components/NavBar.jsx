@@ -14,27 +14,43 @@ import { useAuth } from "../auth";
 const navigation = [
   { to: "/feed", label: "Discover", Icon: Compass },
   { to: "/requests", label: "Requests", Icon: Inbox },
-  { to: "/connections", label: "Connections", Icon: UsersRound },
+  {
+    to: "/connections",
+    label: "Connections",
+    mobileLabel: "Connect",
+    Icon: UsersRound,
+  },
   { to: "/enroll-premium", label: "Premium", Icon: CreditCard },
 ];
 
-function NavItem({ to, label, Icon, mobile = false }) {
+function NavItem({ to, label, mobileLabel = label, Icon, mobile = false }) {
   return (
     <NavLink
       to={to}
       end={to === "/feed"}
       className={({ isActive }) =>
         mobile
-          ? `dock-item ${isActive ? "dock-active" : ""}`
-          : `btn btn-ghost btn-sm ${isActive ? "text-primary" : "text-base-content/70"}`
+          ? `dock-item ${isActive ? "dock-active text-primary font-bold" : ""}`
+          : `btn btn-ghost btn-sm ${isActive ? "text-primary font-bold" : "text-base-content/70"}`
       }
       aria-label={label}
     >
-      <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-      {mobile ? (
-        <span className="dock-label">{label}</span>
-      ) : (
-        <span>{label}</span>
+      {({ isActive }) => (
+        <>
+          <Icon
+            size={20}
+            strokeWidth={isActive ? 2.5 : 1.8}
+            aria-hidden="true"
+          />
+          {mobile ? (
+            <span className="dock-label">
+              <span className="dock-label-full">{label}</span>
+              <span className="dock-label-compact">{mobileLabel}</span>
+            </span>
+          ) : (
+            <span>{label}</span>
+          )}
+        </>
       )}
     </NavLink>
   );
@@ -69,7 +85,7 @@ export default function NavBar() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-base-300/70 bg-base-100/95 backdrop-blur">
-        <div className="navbar mx-auto min-h-16 max-w-6xl px-4 sm:px-6">
+        <div className="navbar mx-auto min-h-16 max-w-6xl px-4 sm:px-6 md:gap-2">
           <div className="flex-1">
             <Link
               to="/"
@@ -160,8 +176,15 @@ export default function NavBar() {
 
       {user && (
         <nav className="dock md:hidden" aria-label="Main navigation">
-          {navigation.map(({ to, label, Icon }) => (
-            <NavItem key={to} to={to} label={label} Icon={Icon} mobile />
+          {navigation.map(({ to, label, mobileLabel, Icon }) => (
+            <NavItem
+              key={to}
+              to={to}
+              label={label}
+              mobileLabel={mobileLabel}
+              Icon={Icon}
+              mobile
+            />
           ))}
           <NavItem to="/profile" label="Profile" Icon={UserRound} mobile />
         </nav>

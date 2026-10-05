@@ -8,6 +8,7 @@ import profileRouter from "./routes/profile.js";
 import requestRouter from "./routes/request.js";
 import userRouter from "./routes/user.js";
 import paymentRouter from "./routes/payment.js";
+import { startEmailWorker } from "./utils/emailNotifications.js";
 
 const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5174";
 const port = Number(process.env.PORT || 7777);
@@ -39,6 +40,7 @@ app.use(paymentRouter);
 
 const startServer = async () => {
   await connectDB();
+  startEmailWorker();
 
   app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

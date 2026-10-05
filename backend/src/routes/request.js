@@ -4,8 +4,10 @@ import authenticateUser from "../middlewares/auth.js";
 import { isValidUserId } from "../utils/validation.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
-
-import { run as sendEmail } from "../utils/sendEmail.js";
+import {
+  dispatchPendingEmails,
+  enqueueEmail,
+} from "../utils/emailNotifications.js";
 
 const sendConnectionRequestAllowedStatuses = ["ignored", "interested"];
 const reviewConnectionRequestAllowedStatuses = ["accepted", "rejected"];
@@ -51,43 +53,33 @@ requestRouter.post(
       }
 
       const connectionRequest = new ConnectionRequest({
-        fromUserId: fromUserId,
-        toUserId: toUserId,
-        status: status,
+        fromUserId,
+        toUserId,
+        status,
       });
+      let connectionRequestData;
 
-      const connectionRequestData = await connectionRequest.save();
+      await ConnectionRequest.db.transaction(async (session) => {
+        connectionRequestData = await connectionRequest.save({ session });
 
-      if (status === "interested") {
-        try {
-          // Temporary override for sandbox testing.
-          // Confirm the actual email field in your User schema.
-          const toAddress = process.env.SES_TEST_TO || targetUser.emailId;
-
-          if (!toAddress) {
-            throw new Error("Recipient email is missing");
-          }
-
-          const senderName = [req.user.firstName, req.user.lastName]
-            .filter(Boolean)
-            .join(" ");
-
-          await sendEmail({
-            toAddress: process.env.SES_TEST_TO || targetUser.emailId,
-            senderName: [req.user.firstName, req.user.lastName]
-              .filter(Boolean)
-              .join(" "),
-            recipientName: targetUser.firstName,
-          });
-
-          console.log("SES accepted email:", emailResponse.MessageId);
-        } catch (emailError) {
-          console.error("Connection saved, but notification failed:", {
-            name: emailError.name,
-            message: emailError.message,
-          });
+        if (status === "interested") {
+          await enqueueEmail(
+            {
+              eventKey: `connection-request:${connectionRequest._id}`,
+              template: "connection-request",
+              toAddress: targetUser.email,
+              data: {
+                recipientName: targetUser.firstName,
+                senderName: [req.user.firstName, req.user.lastName]
+                  .filter(Boolean)
+                  .join(" "),
+              },
+            },
+            { session },
+          );
         }
-      }
+      });
+      if (status === "interested") void dispatchPendingEmails();
 
       return sendSuccess(
         res,
@@ -118,14 +110,53 @@ requestRouter.post(
     }
 
     try {
-      const updatedRequest = await ConnectionRequest.findOneAndUpdate(
-        {
-          _id: requestId,
-          toUserId: loggedInUserId,
-          status: "interested",
+      let requester;
+      const updatedRequest = await ConnectionRequest.db.transaction(
+        async (session) => {
+          const request = await ConnectionRequest.findOneAndUpdate(
+            {
+              _id: requestId,
+              toUserId: loggedInUserId,
+              status: "interested",
+            },
+            { $set: { status } },
+            { new: true, runValidators: true, session },
+          );
+
+          if (!request) return null;
+
+          requester = await User.findById(request.fromUserId)
+            .select("firstName email")
+            .session(session);
+
+          if (requester) {
+            const template =
+              status === "accepted"
+                ? "connection-accepted"
+                : "connection-declined";
+            const data =
+              status === "accepted"
+                ? {
+                    recipientName: requester.firstName,
+                    senderName: [req.user.firstName, req.user.lastName]
+                      .filter(Boolean)
+                      .join(" "),
+                  }
+                : { recipientName: requester.firstName };
+
+            await enqueueEmail(
+              {
+                eventKey: `connection-${status}:${request._id}`,
+                template,
+                toAddress: requester.email,
+                data,
+              },
+              { session },
+            );
+          }
+
+          return request;
         },
-        { $set: { status } },
-        { new: true, runValidators: true },
       );
 
       if (!updatedRequest) {
@@ -135,6 +166,7 @@ requestRouter.post(
           "Connection request not found or already reviewed.",
         );
       }
+      if (requester) void dispatchPendingEmails();
 
       return sendSuccess(
         res,

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Heart, MapPin, RotateCw, X } from "lucide-react";
+import { Check, Heart, MapPin, RotateCw, Sparkles, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../auth";
+import {
+  getCommonGround,
+  getProfileCompletion,
+} from "../profileCompletion";
 
 const PAGE_SIZE = 10;
 const SWIPE_THRESHOLD = 96;
@@ -11,6 +17,7 @@ const EXIT_DURATION = 240;
 const PROMOTION_DURATION = 240;
 
 const Feed = () => {
+  const { user } = useAuth();
   const [people, setPeople] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -23,6 +30,12 @@ const Feed = () => {
   const [pendingDirection, setPendingDirection] = useState(0);
   const [promoting, setPromoting] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const onboardingKey = user?._id
+    ? `devtinder:onboarding-dismissed:${user._id}`
+    : null;
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => onboardingKey && window.localStorage.getItem(onboardingKey) === "true",
+  );
   const seenIds = useRef(new Set());
   const gesture = useRef(null);
   const exitTimer = useRef(null);
@@ -85,7 +98,7 @@ const Feed = () => {
       }
       setAnnouncement(
         status === "interested"
-          ? `You connected with ${activePerson.firstName}.`
+          ? `Connection request sent to ${activePerson.firstName}.`
           : `Passed on ${activePerson.firstName}.`,
       );
       setPendingDirection(0);
@@ -219,6 +232,14 @@ const Feed = () => {
   const initials = activePerson
     ? `${activePerson.firstName?.[0] || ""}${activePerson.lastName?.[0] || ""}`.toUpperCase()
     : "";
+  const profileCompletion = getProfileCompletion(user || {});
+
+  function dismissOnboarding() {
+    if (onboardingKey) window.localStorage.setItem(onboardingKey, "true");
+    setOnboardingDismissed(true);
+  }
+
+  const sharedTags = getCommonGround(user || {}, activePerson || {});
 
   return (
     <section className="page-content" aria-labelledby="feed-title">
@@ -226,7 +247,10 @@ const Feed = () => {
         <div>
           <p className="eyebrow">Your next collaborator</p>
           <h1 id="feed-title">Discover</h1>
-          <p>Find someone whose curiosity matches yours.</p>
+          <p>
+            Find someone whose curiosity matches yours. You’ll connect when
+            they accept your request.
+          </p>
         </div>
         <button
           className="btn btn-ghost btn-square"
@@ -239,6 +263,42 @@ const Feed = () => {
           <RotateCw size={19} aria-hidden="true" />
         </button>
       </div>
+
+      {!onboardingDismissed && (
+        <aside className="onboarding-card" aria-labelledby="onboarding-title">
+          <div className="onboarding-card__copy">
+            <p className="eyebrow">A quick start</p>
+            <h2 id="onboarding-title">Make your next connection count</h2>
+            <p>
+              Add a little more to your profile, meet developers in Discover,
+              then review requests when someone wants to connect.
+            </p>
+            <div className="onboarding-card__steps">
+              <Link to="/profile">
+                {profileCompletion.percent === 100 ? (
+                  <Check size={15} aria-hidden="true" />
+                ) : (
+                  <span aria-hidden="true">1</span>
+                )}
+                Complete your profile ({profileCompletion.percent}%)
+              </Link>
+              <span>
+                <span aria-hidden="true">2</span> Discover developers
+              </span>
+              <Link to="/requests">
+                <span aria-hidden="true">3</span> Review connection requests
+              </Link>
+            </div>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            onClick={dismissOnboarding}
+          >
+            Got it
+          </button>
+        </aside>
+      )}
 
       {error && (
         <div className="alert alert-error mb-5" role="alert">
@@ -353,6 +413,21 @@ const Feed = () => {
                     {activePerson.age ? ` · ${activePerson.age}` : ""}
                   </p>
                 </div>
+                {sharedTags.length > 0 && (
+                  <div className="candidate-common-ground">
+                    <p>
+                      <Sparkles size={14} aria-hidden="true" />
+                      Common ground
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {sharedTags.map((tag) => (
+                        <span className="badge badge-primary badge-outline" key={tag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {activePerson.bio && (
                   <p className="text-sm leading-relaxed">{activePerson.bio}</p>
                 )}
@@ -397,8 +472,8 @@ const Feed = () => {
               type="button"
               onClick={() => sendRequest("interested")}
               disabled={busy}
-              aria-label="Connect with this profile"
-              title="Connect"
+              aria-label={`Send a connection request to ${activePerson.firstName}`}
+              title="Send request"
             >
               {busy ? (
                 <span

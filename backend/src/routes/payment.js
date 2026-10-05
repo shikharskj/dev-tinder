@@ -16,12 +16,15 @@ import authenticateUser from "../middlewares/auth.js";
 import Payment from "../models/payment.js";
 import PaymentWebhookEvent from "../models/paymentWebhookEvent.js";
 import User from "../models/user.js";
+import { enqueueEmail } from "../utils/emailNotifications.js";
 import createRazorpayInstance from "../utils/razorpay.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import { sanitizeSubscriptionRequest } from "../utils/validateSubscriptionRequest.js";
 
 const paymentRouter = express.Router();
+
 const ELITE = Object.freeze({ amount: 19900, currency: "INR", cycles: 12 });
+
 const EVENT_STATUS = new Map([
   ["subscription.authenticated", "authenticated"],
   ["subscription.activated", "active"],
@@ -52,6 +55,7 @@ class HttpError extends Error {
 const fail = (status, message) => {
   throw new HttpError(status, message);
 };
+
 const handle = (label, handler) => async (req, res) => {
   try {
     return await handler(req, res);
@@ -78,6 +82,7 @@ function checkoutResponse(payment) {
     },
   };
 }
+
 function subscriptionResponse(payment) {
   return {
     ...checkoutResponse(payment),
@@ -100,11 +105,14 @@ function subscriptionResponse(payment) {
 }
 function getProvider() {
   const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env;
+
   if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
     fail(503, "Subscriptions are not configured.");
   }
+
   return createRazorpayInstance(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET);
 }
+
 function releaseCreationLock(userId, key, session) {
   return User.updateOne(
     { _id: userId, subscriptionCreationKey: key },
@@ -112,6 +120,7 @@ function releaseCreationLock(userId, key, session) {
     session ? { session } : {},
   );
 }
+
 async function saveCreatedSubscription(attempt, subscription) {
   // Never overwrite lifecycle state or dates: a webhook may already have run.
   const saved = await Payment.findOneAndUpdate(
@@ -131,9 +140,11 @@ async function saveCreatedSubscription(attempt, subscription) {
     },
     { new: true, runValidators: true },
   );
+
   if (!saved)
     fail(503, "Subscription could not be linked to its payment attempt.");
   await releaseCreationLock(saved.userId, saved.idempotencyKey);
+
   return saved;
 }
 
@@ -143,20 +154,32 @@ paymentRouter.post(
   handle("process payment webhook", async (req, res) => {
     const input = parseWebhook(req);
     const record = await getWebhookRecord(input);
+
     // Re-read INSIDE the transaction: simultaneous deliveries must see committed completion.
     const message = await Payment.db.transaction(async (session) => {
       const current = await PaymentWebhookEvent.findById(record._id).session(
         session,
       );
+
       if (!current) fail(503, "Webhook record unavailable. Retry delivery.");
+
       if (current.processingStatus === "processed")
         return "Webhook already processed.";
-      const result = await applySubscriptionEvent(input.event, session);
+
+      const result = await applySubscriptionEvent(
+        input.event,
+        input.eventId,
+        session,
+      );
+
       current.processingStatus = "processed";
       current.processedAt = new Date();
+
       await current.save({ session });
+
       return result;
     });
+
     return sendSuccess(res, 200, message);
   }),
 );
@@ -166,25 +189,31 @@ paymentRouter.get(
   authenticateUser,
   handle("fetch subscription status", async (req, res) => {
     const user = await User.findById(req.user._id).lean();
+
     if (!user) fail(404, "User not found.");
+
     // GET computes expiry without modifying provider state or racing a renewal.
     const active = hasPaidAccess(
       user.usagePlan === "Elite",
       user.eliteSubscriptionExpiresAt,
     );
+
     const query = user.razorpaySubscriptionId
       ? {
           userId: user._id,
           razorpaySubscriptionId: user.razorpaySubscriptionId,
         }
       : { userId: user._id };
+
     const payment = await Payment.findOne(query).sort({ createdAt: -1 }).lean();
+
     const canCheckout =
       payment?.creationStatus === "created" &&
       payment.subscriptionStatus === "created" &&
       payment.razorpaySubscriptionId &&
       !active &&
       process.env.RAZORPAY_KEY_ID;
+
     return sendSuccess(res, 200, "Subscription status fetched.", {
       usagePlan: active ? "Elite" : "Basic",
       creationStatus: payment?.creationStatus ?? null,
@@ -206,18 +235,27 @@ paymentRouter.post(
     if (!sanitizeSubscriptionRequest(req.body)) {
       fail(400, "Provide a valid Elite subscription request.");
     }
+
     const key = req.get("Idempotency-Key");
+
     if (!IDEMPOTENCY_KEY_PATTERN.test(key ?? "")) {
       fail(400, "A valid Idempotency-Key header is required.");
     }
+
     const provider = getProvider();
+
     const planId = process.env.RAZORPAY_ELITE_PLAN_ID;
+
     if (!planId) fail(503, "Elite subscriptions are not configured.");
+
     const userId = req.user._id;
+
     const existing = await Payment.findOne({ idempotencyKey: key });
+
     if (existing) {
       if (String(existing.userId) !== String(userId))
         fail(409, "Request key already in use.");
+
       if (!existing.razorpaySubscriptionId) {
         fail(
           409,
@@ -226,13 +264,16 @@ paymentRouter.post(
             : "Subscription creation is unresolved. Do not start another checkout; contact support.",
         );
       }
+
       if (!ACTIVE_SUBSCRIPTION_STATUSES.includes(existing.subscriptionStatus)) {
         fail(
           409,
           "This subscription has ended. Start a new checkout with a new request key.",
         );
       }
+
       await releaseCreationLock(userId, key);
+
       return sendSuccess(
         res,
         200,
@@ -242,6 +283,7 @@ paymentRouter.post(
     }
 
     const plan = await provider.plans.fetch(planId);
+
     if (
       plan.period !== "monthly" ||
       plan.interval !== 1 ||
@@ -283,11 +325,14 @@ paymentRouter.post(
           },
         ],
       }).sort({ createdAt: -1 });
+
       if (current) {
         await releaseCreationLock(userId, key);
+
         if (!current.razorpaySubscriptionId) {
           fail(409, "A subscription request is still being reconciled.");
         }
+
         return sendSuccess(
           res,
           200,
@@ -295,6 +340,7 @@ paymentRouter.post(
           subscriptionResponse(current),
         );
       }
+
       attempt = new Payment({
         userId,
         firstName: req.user.firstName,
@@ -310,8 +356,10 @@ paymentRouter.post(
         subscriptionStatus: "created",
         accessGranted: false,
       });
+
       await attempt.save();
       requestStarted = true;
+
       remote = await provider.subscriptions.create({
         plan_id: planId,
         total_count: ELITE.cycles,
@@ -324,7 +372,9 @@ paymentRouter.post(
           usagePlan: "Elite",
         },
       });
+
       const saved = await saveCreatedSubscription(attempt, remote);
+
       return sendSuccess(
         res,
         201,
@@ -336,6 +386,7 @@ paymentRouter.post(
       if (remote && attempt) {
         try {
           const saved = await saveCreatedSubscription(attempt, remote);
+
           return sendSuccess(
             res,
             201,
@@ -355,6 +406,7 @@ paymentRouter.post(
         requestStarted &&
         !remote &&
         [400, 401, 403, 404, 422].includes(error?.statusCode);
+
       if (!requestStarted || rejected) {
         // If cleanup fails, keep the lock rather than risk another remote create.
         if (attempt) {
@@ -367,9 +419,11 @@ paymentRouter.post(
             { $set: { creationStatus: "failed" } },
           );
         }
+
         await releaseCreationLock(userId, key);
       }
       if (error instanceof HttpError && !requestStarted) throw error;
+
       fail(
         rejected ? 502 : 503,
         requestStarted && !rejected
@@ -389,6 +443,7 @@ paymentRouter.post(
       razorpay_subscription_id: subscriptionId,
       razorpay_signature: signature,
     } = req.body ?? {};
+
     if (
       typeof paymentId !== "string" ||
       !/^pay_[a-zA-Z0-9]+$/.test(paymentId) ||
@@ -398,13 +453,18 @@ paymentRouter.post(
     ) {
       fail(400, "Invalid subscription checkout response.");
     }
+
     const payment = await Payment.findOne({
       userId: req.user._id,
       razorpaySubscriptionId: subscriptionId,
     });
+
     if (!payment) fail(404, "Subscription not found.");
+
     const secret = process.env.RAZORPAY_KEY_SECRET;
+
     if (!secret) fail(503, "Subscription verification is not configured.");
+
     const valid = razorpayUtils.validatePaymentVerification(
       {
         payment_id: paymentId,
@@ -413,7 +473,9 @@ paymentRouter.post(
       signature.toLowerCase(),
       secret,
     );
+
     if (!valid) fail(400, "Invalid subscription checkout signature.");
+
     // Authentication can be a nominal charge. Only subscription.charged grants access.
     return sendSuccess(
       res,
@@ -430,8 +492,10 @@ paymentRouter.post(
 function parseWebhook(req) {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) fail(503, "Payment webhook is not configured.");
+
   const signature = req.get("x-razorpay-signature");
   const eventId = req.get("x-razorpay-event-id");
+
   if (
     !Buffer.isBuffer(req.body) ||
     !WEBHOOK_SIGNATURE_PATTERN.test(signature ?? "") ||
@@ -441,6 +505,7 @@ function parseWebhook(req) {
   ) {
     fail(400, "Invalid payment webhook request.");
   }
+
   if (
     !Razorpay.validateWebhookSignature(
       req.body,
@@ -450,12 +515,14 @@ function parseWebhook(req) {
   ) {
     fail(400, "Invalid payment webhook signature.");
   }
+
   let event;
   try {
     event = JSON.parse(req.body.toString("utf8"));
   } catch {
     fail(400, "Invalid payment webhook payload.");
   }
+
   if (
     !event ||
     Array.isArray(event) ||
@@ -464,6 +531,7 @@ function parseWebhook(req) {
   ) {
     fail(400, "Invalid payment webhook event.");
   }
+
   return {
     event,
     eventId,
@@ -472,7 +540,9 @@ function parseWebhook(req) {
 }
 async function getWebhookRecord({ event, eventId, payloadHash }) {
   const query = { $or: [{ eventId }, { payloadHash }] };
+
   let record = await PaymentWebhookEvent.findOne(query);
+
   if (!record) {
     try {
       record = await PaymentWebhookEvent.create({
@@ -486,28 +556,46 @@ async function getWebhookRecord({ event, eventId, payloadHash }) {
       record = await PaymentWebhookEvent.findOne(query);
     }
   }
+
   if (!record) fail(503, "Webhook record unavailable. Retry delivery.");
+
   if (record.payloadHash !== payloadHash)
     fail(400, "Event ID has a different payload.");
+
   return record;
 }
 
-async function applySubscriptionEvent(event, session) {
+function formatEmailDate(date) {
+  return date
+    ? new Intl.DateTimeFormat("en-IN", {
+        dateStyle: "long",
+        timeZone: "UTC",
+      }).format(date)
+    : null;
+}
+
+async function applySubscriptionEvent(event, eventId, session) {
   let status = EVENT_STATUS.get(event.event);
+
   if (!status) return "Webhook event acknowledged.";
+
   const subscription = event.payload?.subscription?.entity;
   const subscriptionId = subscription?.id;
   const eventDate = toUnixDate(event.created_at);
+
   if (typeof subscriptionId !== "string" || !subscriptionId || !eventDate) {
     fail(
       400,
       "Webhook requires a subscription entity and a valid event timestamp.",
     );
   }
+
   let payment = await Payment.findOne({
     razorpaySubscriptionId: subscriptionId,
   }).session(session);
+
   const attemptId = subscription.notes?.paymentAttemptId;
+
   if (
     !payment &&
     typeof attemptId === "string" &&
@@ -515,14 +603,17 @@ async function applySubscriptionEvent(event, session) {
   ) {
     payment = await Payment.findById(attemptId).session(session);
   }
+
   if (!payment)
     fail(503, "Subscription record is not available yet. Retry delivery.");
+
   if (
     payment.razorpaySubscriptionId &&
     payment.razorpaySubscriptionId !== subscriptionId
   ) {
     fail(409, "Payment attempt belongs to a different subscription.");
   }
+
   if (
     subscription.plan_id !== payment.razorpayPlanId ||
     (subscription.notes?.userId &&
@@ -530,11 +621,16 @@ async function applySubscriptionEvent(event, session) {
   ) {
     fail(409, "Subscription does not match the local payment attempt.");
   }
+
   status = resolveEventStatus(payment, status, eventDate);
+
   if (!status) return "Older webhook event ignored.";
   const charged = event.event === "subscription.charged";
+  const firstSuccessfulCharge = !payment.subscriptionStartDate;
+
   if (charged) {
     const charge = event.payload?.payment?.entity;
+
     if (
       !charge ||
       charge.status !== "captured" ||
@@ -553,6 +649,7 @@ async function applySubscriptionEvent(event, session) {
     subscriptionExpiresIn: toUnixDate(subscription.current_end),
     nextBillingAt: toUnixDate(subscription.charge_at),
   };
+
   if (
     charged &&
     (!dates.subscriptionStartDate ||
@@ -565,10 +662,12 @@ async function applySubscriptionEvent(event, session) {
       "Charged event has missing or invalid billing dates. Reconciliation required.",
     );
   }
+
   payment.razorpaySubscriptionId = subscriptionId;
   payment.creationStatus = "created";
   payment.subscriptionStatus = status;
   payment.lastProviderEventAt = eventDate;
+
   if (charged) {
     payment.accessGranted = !REVOKE_ACCESS.has(status);
     Object.assign(payment, dates);
@@ -577,12 +676,17 @@ async function applySubscriptionEvent(event, session) {
     payment.accessGranted = false;
     payment.nextBillingAt = null;
   }
+
   await payment.save({ session });
 
   const user = await User.findById(payment.userId).session(session);
+
   if (!user)
     fail(503, "Subscription user is unavailable. Reconciliation required.");
+
   const update = {};
+  let notification = null;
+
   if (charged && !REVOKE_ACCESS.has(status)) {
     if (
       user.razorpaySubscriptionId &&
@@ -593,32 +697,87 @@ async function applySubscriptionEvent(event, session) {
         "User is linked to a different subscription. Reconciliation required.",
       );
     }
+
     update.$set = {
       usagePlan: "Elite",
       razorpaySubscriptionId: subscriptionId,
       eliteSubscriptionExpiresAt: dates.subscriptionExpiresIn,
+    };
+    notification = {
+      template: firstSuccessfulCharge ? "elite-purchase" : "elite-renewal",
+      data: firstSuccessfulCharge
+        ? {
+            recipientName: payment.firstName,
+            amount: (payment.amount / 100).toFixed(2),
+            currency: payment.currency,
+            billingCycles: payment.totalBillingCycles,
+            expiresAt: formatEmailDate(dates.subscriptionExpiresIn),
+          }
+        : {
+            recipientName: payment.firstName,
+            amount: (payment.amount / 100).toFixed(2),
+            currency: payment.currency,
+            nextBillingAt: formatEmailDate(dates.nextBillingAt),
+          },
     };
   } else if (
     REVOKE_ACCESS.has(status) &&
     user.razorpaySubscriptionId === subscriptionId
   ) {
     update.$set = { usagePlan: "Basic" };
+
     update.$unset = {
       razorpaySubscriptionId: 1,
       eliteSubscriptionExpiresAt: 1,
     };
   }
+  if (status === "halted" || status === "paused") {
+    notification = {
+      template: "elite-payment-attention",
+      data: {
+        recipientName: payment.firstName,
+        status,
+      },
+    };
+  } else if (
+    ["cancelled", "completed", "expired"].includes(status)
+  ) {
+    notification = {
+      template: "elite-subscription-ended",
+      data: {
+        recipientName: payment.firstName,
+        status,
+        effectiveDate: formatEmailDate(eventDate),
+      },
+    };
+  }
+
   if (user.subscriptionCreationKey === payment.idempotencyKey) {
     update.$unset = { ...update.$unset, subscriptionCreationKey: 1 };
   }
+
   if (Object.keys(update).length) {
     const result = await User.updateOne({ _id: user._id }, update, {
       session,
       runValidators: true,
     });
+
     if (result.matchedCount !== 1)
       fail(503, "Subscription user changed. Retry delivery.");
   }
+
+  if (notification) {
+    await enqueueEmail(
+      {
+        eventKey: `razorpay:${eventId}:${notification.template}`,
+        template: notification.template,
+        toAddress: payment.email,
+        data: notification.data,
+      },
+      { session },
+    );
+  }
+
   return "Webhook processed.";
 }
 

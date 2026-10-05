@@ -262,16 +262,17 @@ export default function EnrollPremium() {
           </p>
           <h1 id="premium-heading">Make every connection count.</h1>
           <p>
-            Start with the essentials, or go Elite to get seen sooner and make
-            more of every conversation.
+            Compare the free community experience with the paid Elite
+            subscription. We’ll clearly mark which product benefits are
+            available today.
           </p>
         </div>
         <div className="premium-hero__mark" aria-hidden="true">
           <Crown size={34} strokeWidth={1.5} />
           <span>
-            More room
+            Clear
             <br />
-            to connect
+            choices
           </span>
         </div>
       </section>
@@ -293,12 +294,18 @@ export default function EnrollPremium() {
         <div className="premium-message premium-message--success" role="status">
           <CircleCheck size={20} aria-hidden="true" />
           <span>
-            Elite is active
+            Elite subscription is active
             {subscription?.expiresAt &&
               ` until ${formatDate(subscription.expiresAt)}`}
           </span>
         </div>
       )}
+
+      <div className="premium-capability-note" role="note">
+        Elite is currently a paid subscription tier. Features marked as
+        unavailable below are not active in the app yet; review the comparison
+        before upgrading.
+      </div>
 
       <section className="premium-plans" aria-labelledby="plans-heading">
         <div className="premium-plans__intro">
@@ -340,7 +347,7 @@ export default function EnrollPremium() {
                 ) : plan.name === "Elite" ? (
                   <span className="premium-plan__badge premium-plan__badge--elite">
                     <Sparkles size={13} aria-hidden="true" />
-                    More visibility
+                    Paid subscription
                   </span>
                 ) : (
                   <span className="premium-plan__badge">Free plan</span>
@@ -349,7 +356,7 @@ export default function EnrollPremium() {
 
               <p className="premium-plan__description">
                 {plan.name === "Elite" && currentPlan === "Elite"
-                  ? "You’re all set. Enjoy the full Elite experience."
+                  ? "Your paid subscription is active. See the feature availability below."
                   : plan.description}
               </p>
 
@@ -360,7 +367,9 @@ export default function EnrollPremium() {
 
               <div className="premium-plan__divider" />
 
-              <p className="premium-plan__features-title">What’s included</p>
+              <p className="premium-plan__features-title">
+                Feature availability
+              </p>
               <ul className="premium-plan__features">
                 {plan.features.map((feature) => (
                   <li key={feature.label}>
@@ -481,9 +490,10 @@ export default function EnrollPremium() {
         </div>
 
         <p className="premium-footnote">
-          Elite is billed monthly for 12 cycles. After the 12th cycle, your plan
-          returns to Basic automatically. The Elite badge highlights your plan;
-          it does not indicate identity verification.
+          Elite costs ₹199 per month for 12 monthly billing cycles. After the
+          final cycle, your plan returns to Basic automatically. The feature
+          list above reflects what is currently implemented; features marked
+          unavailable are not part of the active app experience yet.
         </p>
         <p className="premium-security-note">
           <ShieldCheck size={16} aria-hidden="true" />

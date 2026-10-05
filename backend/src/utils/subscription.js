@@ -32,11 +32,15 @@ const TIE_PRIORITY = [
   "expired",
   "cancelled",
 ];
+
 const ENDED = new Set(["cancelled", "completed", "expired"]);
 
 export function resolveEventStatus(payment, incoming, eventDate) {
   const previousDate = payment.lastProviderEventAt;
-  if (previousDate && eventDate < previousDate) return null;
+
+  if (previousDate && eventDate < previousDate) {
+    return null;
+  }
   if (ENDED.has(payment.subscriptionStatus) && !ENDED.has(incoming)) {
     return null; // A delayed charge must not resurrect an ended subscription.
   }

@@ -4,6 +4,7 @@ import { useBlocker, useBeforeUnload } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import TagInput from "../components/TagInput";
+import { getProfileCompletion } from "../profileCompletion";
 
 function formFromUser(user) {
   return {
@@ -129,6 +130,7 @@ const Profile = () => {
   const fullName = `${form.firstName} ${form.lastName}`.trim();
   const initials =
     `${form.firstName?.[0] || ""}${form.lastName?.[0] || ""}`.toUpperCase();
+  const profileCompletion = getProfileCompletion(form);
 
   return (
     <section className="page-content" aria-labelledby="profile-title">
@@ -167,6 +169,48 @@ const Profile = () => {
           <Check size={18} aria-hidden="true" /> Profile saved.
         </div>
       )}
+
+      <section className="profile-completion" aria-labelledby="profile-completion-title">
+        <div className="profile-completion__summary">
+          <div>
+            <p className="eyebrow">Profile strength</p>
+            <h2 id="profile-completion-title">
+              {profileCompletion.percent === 100
+                ? "Your introduction is ready"
+                : `${profileCompletion.percent}% complete`}
+            </h2>
+          </div>
+          <span>
+            {profileCompletion.completedCount}/{profileCompletion.totalCount} details
+          </span>
+        </div>
+        <progress
+          className="progress progress-primary w-full"
+          value={profileCompletion.percent}
+          max="100"
+          aria-label={`Profile ${profileCompletion.percent}% complete`}
+        />
+        {profileCompletion.missing.length > 0 ? (
+          <>
+            <ul className="profile-completion__suggestions">
+              {profileCompletion.missing.map(({ label }) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+            <button
+              className="btn btn-outline btn-sm mt-3"
+              type="button"
+              onClick={() => setEditing(true)}
+            >
+              Improve your profile
+            </button>
+          </>
+        ) : (
+          <p className="profile-completion__ready">
+            Developers can see your photo, introduction, skills, and interests.
+          </p>
+        )}
+      </section>
 
       <div className={`profile-layout${editing ? " is-editing" : ""}`}>
         <article className="card profile-preview">
