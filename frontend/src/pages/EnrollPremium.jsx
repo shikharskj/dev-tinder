@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { USAGE_PLANS } from "../constants";
@@ -258,21 +259,33 @@ export default function EnrollPremium() {
         <div className="premium-hero__copy">
           <p className="premium-eyebrow">
             <Sparkles size={15} aria-hidden="true" />
-            Find your next great connection
+            {currentPlan === "Elite"
+              ? "A little more room to connect"
+              : "Find your next great connection"}
           </p>
-          <h1 id="premium-heading">Make every connection count.</h1>
+          <h1 id="premium-heading">
+            {currentPlan === "Elite"
+              ? "You’re in the Elite group."
+              : "Make every connection count."}
+          </h1>
           <p>
-            Compare the free community experience with the paid Elite
-            subscription. We’ll clearly mark which product benefits are
-            available today.
+            {currentPlan === "Elite"
+              ? "Your membership is active. Enjoy unlimited connection requests, priority discovery placement, and your distinctive Elite profile badge."
+              : "Compare the free community experience with Elite, and choose the room to connect that works for you."}
           </p>
         </div>
         <div className="premium-hero__mark" aria-hidden="true">
-          <Crown size={34} strokeWidth={1.5} />
+          {currentPlan === "Elite" ? (
+            <BadgeCheck size={38} strokeWidth={1.6} />
+          ) : (
+            <Crown size={34} strokeWidth={1.5} />
+          )}
           <span>
-            Clear
-            <br />
-            choices
+            {currentPlan === "Elite" ? (
+              <>Elite<br />member</>
+            ) : (
+              <>Clear<br />choices</>
+            )}
           </span>
         </div>
       </section>
@@ -291,20 +304,40 @@ export default function EnrollPremium() {
       )}
 
       {currentPlan === "Elite" && (
-        <div className="premium-message premium-message--success" role="status">
-          <CircleCheck size={20} aria-hidden="true" />
-          <span>
-            Elite subscription is active
-            {subscription?.expiresAt &&
-              ` until ${formatDate(subscription.expiresAt)}`}
-          </span>
-        </div>
+        <section className="elite-member-panel" aria-label="Elite membership">
+          <div className="elite-member-panel__identity">
+            <span className="elite-member-panel__icon">
+              <CircleCheck size={22} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="premium-section-label">Membership active</p>
+              <h2>Welcome to Elite</h2>
+              <p>
+                {subscription?.expiresAt
+                  ? `Your current paid access is active until ${formatDate(subscription.expiresAt)}.`
+                  : "Your Elite membership is active and your benefits are ready."}
+              </p>
+            </div>
+          </div>
+          <div className="elite-member-panel__details">
+            <span>Next billing date</span>
+            <strong>
+              {subscription?.nextBillingAt
+                ? formatDate(subscription.nextBillingAt)
+                : "Available after authorization"}
+            </strong>
+          </div>
+          <Link className="btn btn-primary" to="/feed">
+            <Sparkles size={17} aria-hidden="true" />
+            Discover with Elite
+          </Link>
+        </section>
       )}
 
       <div className="premium-capability-note" role="note">
-        Elite is currently a paid subscription tier. Features marked as
-        unavailable below are not active in the app yet; review the comparison
-        before upgrading.
+        Elite currently includes unlimited connection requests, priority
+        placement in Discover, and a profile badge. In-app messaging, message
+        history, and read receipts are not available yet.
       </div>
 
       <section className="premium-plans" aria-labelledby="plans-heading">

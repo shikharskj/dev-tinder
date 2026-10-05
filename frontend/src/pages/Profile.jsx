@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Eye, MapPin, Pencil, Trash2, UserRound } from "lucide-react";
+import {
+  BadgeCheck,
+  Check,
+  Eye,
+  MapPin,
+  Pencil,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { useBlocker, useBeforeUnload } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -234,6 +242,12 @@ const Profile = () => {
                 {fullName || "Your name"}
                 {form.age ? ` · ${form.age}` : ""}
               </h2>
+              {user?.usagePlan === "Elite" && (
+                <span className="elite-member-badge mt-2">
+                  <BadgeCheck size={15} aria-hidden="true" />
+                  Elite member
+                </span>
+              )}
               <p className="mt-2 flex items-center gap-1 text-sm text-base-content/65">
                 <MapPin size={15} aria-hidden="true" />
                 {form.location || "Add your location"}

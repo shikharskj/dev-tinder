@@ -7,7 +7,7 @@ export const USAGE_PLANS = [
     features: [
       {
         label: "Connection requests",
-        value: "No daily cap is currently enforced",
+        value: "Up to 20 connection requests each day",
       },
       { label: "Discovery placement", value: "Standard feed ordering" },
       {
@@ -27,7 +27,7 @@ export const USAGE_PLANS = [
       },
       {
         label: "Profile badge",
-        value: "Plan badges are not shown yet",
+        value: "Standard profile",
         included: false,
       },
     ],
@@ -41,13 +41,11 @@ export const USAGE_PLANS = [
     features: [
       {
         label: "Connection requests",
-        value: "An Elite-specific allowance is not active yet",
-        included: false,
+        value: "Unlimited connection requests",
       },
       {
         label: "Discovery placement",
-        value: "Priority placement is not active yet",
-        included: false,
+        value: "Elite profiles are prioritized in Discover",
       },
       {
         label: "Messaging",
@@ -66,8 +64,7 @@ export const USAGE_PLANS = [
       },
       {
         label: "Profile badge",
-        value: "Elite badges are not shown yet",
-        included: false,
+        value: "Distinctive Elite badge on your profile and discovery card",
       },
     ],
     current: false,

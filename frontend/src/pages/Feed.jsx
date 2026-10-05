@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Heart, MapPin, RotateCw, Sparkles, X } from "lucide-react";
+import {
+  BadgeCheck,
+  Check,
+  Heart,
+  MapPin,
+  RotateCw,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import {
   getCommonGround,
   getProfileCompletion,
+  hasMemberAddedPhoto,
+  hasMemberWrittenBio,
 } from "../profileCompletion";
 
 const PAGE_SIZE = 10;
@@ -30,6 +40,8 @@ const Feed = () => {
   const [pendingDirection, setPendingDirection] = useState(0);
   const [promoting, setPromoting] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [requestQuota, setRequestQuota] = useState(null);
+  const [expandedProfileId, setExpandedProfileId] = useState(null);
   const onboardingKey = user?._id
     ? `devtinder:onboarding-dismissed:${user._id}`
     : null;
@@ -71,6 +83,35 @@ const Feed = () => {
     };
   }, [reloadKey]);
 
+  useEffect(() => {
+    let active = true;
+
+    const refreshQuota = async (showError = false) => {
+      try {
+        const { data } = await api.get("/request/quota");
+        if (active) setRequestQuota(data);
+      } catch (requestError) {
+        if (active && showError) setError(requestError.message);
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshQuota();
+    };
+
+    void refreshQuota(true);
+    const interval = window.setInterval(refreshWhenVisible, 30_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
   useEffect(
     () => () => {
       window.clearTimeout(exitTimer.current);
@@ -82,6 +123,11 @@ const Feed = () => {
   async function sendRequest(status) {
     const activePerson = people[0];
     if (!activePerson || busy) return;
+    if (status === "interested" && requestLimitReached) {
+      setOffsetX(0);
+      setError("You’ve reached today’s 20 request limit. Upgrade to Elite for unlimited requests.");
+      return;
+    }
 
     const direction = status === "interested" ? 1 : -1;
     setBusy(true);
@@ -90,7 +136,10 @@ const Feed = () => {
     setError("");
 
     try {
-      await api.post(`/request/send/${status}/${activePerson._id}`);
+      const { data } = await api.post(
+        `/request/send/${status}/${activePerson._id}`,
+      );
+      if (data?.quota) setRequestQuota(data.quota);
       try {
         if (typeof navigator.vibrate === "function") navigator.vibrate(12);
       } catch {
@@ -122,6 +171,9 @@ const Feed = () => {
         }
       }, EXIT_DURATION);
     } catch (requestError) {
+      if (requestError.status === 429 && requestError.details) {
+        setRequestQuota((current) => ({ ...current, ...requestError.details }));
+      }
       setError(requestError.message);
       setOffsetX(0);
       setExitDirection(0);
@@ -226,6 +278,12 @@ const Feed = () => {
   }
 
   const activePerson = people[0];
+  const requestLimitReached =
+    requestQuota &&
+    !requestQuota.isElite &&
+    requestQuota.remaining === 0;
+  const showAllProfileTags =
+    String(expandedProfileId) === String(activePerson?._id);
   const swipeStrength = Math.min(Math.abs(offsetX) / SWIPE_THRESHOLD, 1);
   const activeDirection =
     pendingDirection || exitDirection || (offsetX >= 0 ? 1 : -1);
@@ -311,6 +369,33 @@ const Feed = () => {
         </div>
       )}
 
+      {requestQuota && (
+        <div className="daily-request-quota" role="status">
+          {requestQuota.isElite ? (
+            <>
+              <BadgeCheck size={17} aria-hidden="true" />
+              <span>
+                Your Elite plan:{" "}
+                <strong>unlimited outgoing connection requests</strong>
+              </span>
+            </>
+          ) : (
+            <>
+              <span>
+                Your Basic plan · today’s requests:{" "}
+                <strong>
+                  {requestQuota.used} / {requestQuota.limit}
+                </strong>
+                <small>Resets at midnight UTC</small>
+              </span>
+              {requestQuota.remaining === 0 && (
+                <Link to="/enroll-premium">Get unlimited with Elite</Link>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="swipe-loading" aria-label="Loading profiles">
           <div className="card candidate-card swipe-loading-card">
@@ -387,10 +472,10 @@ const Feed = () => {
                 )}
               </span>
               <figure className="candidate-photo">
-                {activePerson.photoUrl ? (
+                {hasMemberAddedPhoto(activePerson) ? (
                   <img
                     src={activePerson.photoUrl}
-                    alt={`${activePerson.firstName} ${activePerson.lastName}`}
+                    alt=""
                     draggable="false"
                   />
                 ) : (
@@ -398,92 +483,171 @@ const Feed = () => {
                     className="candidate-photo__placeholder"
                     aria-hidden="true"
                   >
-                    {initials}
+                    {initials || "?"}
                   </div>
                 )}
-              </figure>
-              <div className="card-body gap-3 p-5 sm:p-6">
-                <div>
-                  <h2 className="card-title text-2xl">
-                    {activePerson.firstName} {activePerson.lastName}
-                  </h2>
-                  <p className="mt-1 flex items-center gap-1 text-sm text-base-content/65">
+                <figcaption className="candidate-photo__identity">
+                  <div className="candidate-photo__name-row">
+                    <h2>
+                      {activePerson.firstName} {activePerson.lastName}
+                    </h2>
+                    {activePerson.isElite && (
+                      <span
+                        className="elite-member-badge"
+                        aria-label="This profile belongs to an Elite member"
+                      >
+                        <BadgeCheck size={15} aria-hidden="true" />
+                        Elite profile
+                      </span>
+                    )}
+                  </div>
+                  <p>
                     <MapPin size={15} aria-hidden="true" />
-                    {activePerson.location}
+                    Based in {activePerson.location}
                     {activePerson.age ? ` · ${activePerson.age}` : ""}
                   </p>
-                </div>
+                </figcaption>
+              </figure>
+              <div className="card-body candidate-card__body gap-3 p-5 sm:p-6">
                 {sharedTags.length > 0 && (
                   <div className="candidate-common-ground">
                     <p>
                       <Sparkles size={14} aria-hidden="true" />
-                      Common ground
+                      You both listed
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {sharedTags.map((tag) => (
-                        <span className="badge badge-primary badge-outline" key={tag}>
-                          {tag}
+                      {sharedTags.map(({ field, value }) => (
+                        <span
+                          className="badge badge-primary badge-outline candidate-common-ground__tag"
+                          key={`${field}:${value.toLocaleLowerCase()}`}
+                        >
+                          {value}
+                          <span className="candidate-common-ground__kind">
+                            {field === "skills" ? "skill" : "interest"}
+                          </span>
                         </span>
                       ))}
                     </div>
                   </div>
                 )}
-                {activePerson.bio && (
-                  <p className="text-sm leading-relaxed">{activePerson.bio}</p>
+                {hasMemberWrittenBio(activePerson) && (
+                  <div className="candidate-profile-detail">
+                    <p className="candidate-profile-detail__label">
+                      About · self-written
+                    </p>
+                    <p className="text-sm leading-relaxed">{activePerson.bio}</p>
+                  </div>
                 )}
                 {!!activePerson.skills?.length && (
-                  <div className="flex flex-wrap gap-2">
-                    {activePerson.skills.map((skill) => (
-                      <span className="badge badge-outline" key={skill}>
-                        {skill}
-                      </span>
-                    ))}
+                  <div className="candidate-profile-detail">
+                    <p className="candidate-profile-detail__label">
+                      Skills listed
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {activePerson.skills
+                        .slice(0, showAllProfileTags ? undefined : 3)
+                        .map((skill) => (
+                          <span className="badge badge-outline" key={skill}>
+                            {skill}
+                          </span>
+                        ))}
+                    </div>
                   </div>
                 )}
                 {!!activePerson.interests?.length && (
-                  <p className="text-xs text-base-content/65">
-                    Into {activePerson.interests.slice(0, 3).join(" · ")}
-                  </p>
+                  <div className="candidate-profile-detail">
+                    <p className="candidate-profile-detail__label">
+                      Interests listed
+                    </p>
+                    <p className="text-xs text-base-content/65">
+                      {activePerson.interests
+                        .slice(0, showAllProfileTags ? undefined : 3)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                )}
+                {!sharedTags.length &&
+                  !hasMemberWrittenBio(activePerson) &&
+                  !activePerson.skills?.length &&
+                  !activePerson.interests?.length && (
+                    <p className="candidate-card__empty">
+                      This developer is still building their profile.
+                    </p>
+                  )}
+                {(activePerson.skills?.length > 3 ||
+                  activePerson.interests?.length > 3) && (
+                  <button
+                    className="candidate-card__more"
+                    type="button"
+                    aria-expanded={showAllProfileTags}
+                    onClick={() =>
+                      setExpandedProfileId((current) =>
+                        String(current) === String(activePerson._id)
+                          ? null
+                          : activePerson._id,
+                      )
+                    }
+                  >
+                    {showAllProfileTags
+                      ? "Show fewer details"
+                      : `Show ${
+                          Math.max(
+                            0,
+                            (activePerson.skills?.length || 0) - 3,
+                          ) +
+                          Math.max(
+                            0,
+                            (activePerson.interests?.length || 0) - 3,
+                          )
+                        } more`}
+                  </button>
                 )}
               </div>
+              <div className="swipe-actions" aria-label="Profile actions">
+                <div className="swipe-action-group">
+                  <button
+                    className="btn btn-outline btn-circle swipe-action swipe-action--pass"
+                    type="button"
+                    onClick={() => sendRequest("ignored")}
+                    disabled={busy}
+                    aria-label="Pass on this profile"
+                    title="Pass"
+                  >
+                    {busy ? (
+                      <span
+                        className="loading loading-spinner"
+                        aria-label="Sending choice"
+                      />
+                    ) : (
+                      <X size={24} aria-hidden="true" />
+                    )}
+                  </button>
+                  <span>Pass</span>
+                </div>
+                <div className="swipe-action-group">
+                  <button
+                    className="btn btn-primary btn-circle swipe-action swipe-action--connect"
+                    type="button"
+                    onClick={() => sendRequest("interested")}
+                    disabled={busy || requestLimitReached}
+                    aria-label={`Send a connection request to ${activePerson.firstName}`}
+                    title="Send request"
+                  >
+                    {busy ? (
+                      <span
+                        className="loading loading-spinner"
+                        aria-label="Sending choice"
+                      />
+                    ) : (
+                      <Heart size={24} aria-hidden="true" />
+                    )}
+                  </button>
+                  <span>
+                    {requestLimitReached ? "Limit reached" : "Connect"}
+                  </span>
+                </div>
+              </div>
             </article>
-          </div>
-
-          <div className="swipe-actions" aria-label="Profile actions">
-            <button
-              className="btn btn-outline btn-circle swipe-action swipe-action--pass"
-              type="button"
-              onClick={() => sendRequest("ignored")}
-              disabled={busy}
-              aria-label="Pass on this profile"
-              title="Pass"
-            >
-              {busy ? (
-                <span
-                  className="loading loading-spinner"
-                  aria-label="Sending choice"
-                />
-              ) : (
-                <X size={24} aria-hidden="true" />
-              )}
-            </button>
-            <button
-              className="btn btn-primary btn-circle swipe-action swipe-action--connect"
-              type="button"
-              onClick={() => sendRequest("interested")}
-              disabled={busy}
-              aria-label={`Send a connection request to ${activePerson.firstName}`}
-              title="Send request"
-            >
-              {busy ? (
-                <span
-                  className="loading loading-spinner"
-                  aria-label="Sending choice"
-                />
-              ) : (
-                <Heart size={24} aria-hidden="true" />
-              )}
-            </button>
           </div>
         </>
       )}

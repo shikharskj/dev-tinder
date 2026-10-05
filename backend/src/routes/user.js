@@ -4,6 +4,7 @@ import authenticateUser from "../middlewares/auth.js";
 import { DIGITS_ONLY_PATTERN, UPDATE_FIELDS } from "../../constants.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
+import mongoose from "mongoose";
 
 const userRouter = express.Router();
 
@@ -157,18 +158,46 @@ userRouter.get("/feed", authenticateUser, async (req, res) => {
       hideUsersFromFeed.add(request.toUserId.toString());
     });
 
-    const users = await User.find({
-      $and: [
-        { _id: { $nin: Array.from(hideUsersFromFeed) } },
-        { _id: { $ne: loggedInUserId } },
-      ],
-    })
-      .select(
-        "firstName lastName photoUrl bio skills interests location age gender",
-      )
-      .sort({ _id: 1 })
-      .skip(skip)
-      .limit(limit);
+    const users = await User.aggregate([
+      {
+        $match: {
+          _id: {
+            $nin: Array.from(
+              hideUsersFromFeed,
+              (userId) => new mongoose.Types.ObjectId(userId),
+            ),
+            $ne: loggedInUserId,
+          },
+        },
+      },
+      {
+        $addFields: {
+          isElite: {
+            $and: [
+              { $eq: ["$usagePlan", "Elite"] },
+              { $gt: ["$eliteSubscriptionExpiresAt", new Date()] },
+            ],
+          },
+        },
+      },
+      { $sort: { isElite: -1, _id: 1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          firstName: 1,
+          lastName: 1,
+          photoUrl: 1,
+          bio: 1,
+          skills: 1,
+          interests: 1,
+          location: 1,
+          age: 1,
+          gender: 1,
+          isElite: 1,
+        },
+      },
+    ]);
 
     return sendSuccess(res, 200, "Feed fetched successfully.", users);
   } catch (error) {

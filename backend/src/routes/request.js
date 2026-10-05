@@ -4,6 +4,8 @@ import authenticateUser from "../middlewares/auth.js";
 import { isValidUserId } from "../utils/validation.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
+import DailyConnectionQuota from "../models/dailyConnectionQuota.js";
+import { addSeconds, fromUnixTime, getUnixTime } from "date-fns";
 import {
   dispatchPendingEmails,
   enqueueEmail,
@@ -11,8 +13,81 @@ import {
 
 const sendConnectionRequestAllowedStatuses = ["ignored", "interested"];
 const reviewConnectionRequestAllowedStatuses = ["accepted", "rejected"];
+const BASIC_DAILY_REQUEST_LIMIT = 20;
+const SECONDS_PER_DAY = 24 * 60 * 60;
 
 const requestRouter = express.Router();
+
+class DailyLimitError extends Error {
+  constructor(resetAt) {
+    super("You’ve reached today’s 20 connection request limit.");
+    this.resetAt = resetAt;
+  }
+}
+
+function getUtcDayWindow(now = new Date()) {
+  const dayStart = fromUnixTime(
+    Math.floor(getUnixTime(now) / SECONDS_PER_DAY) * SECONDS_PER_DAY,
+  );
+  return { dayStart, resetAt: addSeconds(dayStart, SECONDS_PER_DAY) };
+}
+
+async function ensureDailyQuota(userId, dayStart) {
+  try {
+    await DailyConnectionQuota.updateOne(
+      { userId, dayStart },
+      { $setOnInsert: { requestsUsed: 0 } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+  }
+}
+
+async function getQuotaStatus(user, now = new Date()) {
+  const isElite = user.usagePlan === "Elite";
+  const { dayStart, resetAt } = getUtcDayWindow(now);
+
+  if (isElite) {
+    return {
+      usagePlan: "Elite",
+      isElite: true,
+      limit: null,
+      used: null,
+      remaining: null,
+      resetAt: null,
+    };
+  }
+
+  const quota = await DailyConnectionQuota.findOne({
+    userId: user._id,
+    dayStart,
+  }).lean();
+  const used = quota?.requestsUsed ?? 0;
+
+  return {
+    usagePlan: "Basic",
+    isElite: false,
+    limit: BASIC_DAILY_REQUEST_LIMIT,
+    used,
+    remaining: Math.max(0, BASIC_DAILY_REQUEST_LIMIT - used),
+    resetAt,
+  };
+}
+
+requestRouter.get("/request/quota", authenticateUser, async (req, res) => {
+  try {
+    return sendSuccess(
+      res,
+      200,
+      "Daily connection request allowance fetched.",
+      await getQuotaStatus(req.user),
+    );
+  } catch (error) {
+    console.error("Error fetching daily connection request allowance:", error);
+    return sendError(res, 500, "Unable to fetch your daily request allowance.");
+  }
+});
 
 requestRouter.post(
   `/request/send/:status/:toUserId`,
@@ -52,14 +127,36 @@ requestRouter.post(
         );
       }
 
+      const pairKey = [String(fromUserId), String(toUserId)].sort().join(":");
       const connectionRequest = new ConnectionRequest({
+        pairKey,
         fromUserId,
         toUserId,
         status,
       });
       let connectionRequestData;
+      let quotaUsage;
+      const quotaWindow = getUtcDayWindow();
+
+      if (status === "interested" && req.user.usagePlan !== "Elite") {
+        await ensureDailyQuota(fromUserId, quotaWindow.dayStart);
+      }
 
       await ConnectionRequest.db.transaction(async (session) => {
+        if (status === "interested" && req.user.usagePlan !== "Elite") {
+          quotaUsage = await DailyConnectionQuota.findOneAndUpdate(
+            {
+              userId: fromUserId,
+              dayStart: quotaWindow.dayStart,
+              requestsUsed: { $lt: BASIC_DAILY_REQUEST_LIMIT },
+            },
+            { $inc: { requestsUsed: 1 } },
+            { returnDocument: "after", session },
+          );
+
+          if (!quotaUsage) throw new DailyLimitError(quotaWindow.resetAt);
+        }
+
         connectionRequestData = await connectionRequest.save({ session });
 
         if (status === "interested") {
@@ -81,13 +178,34 @@ requestRouter.post(
       });
       if (status === "interested") void dispatchPendingEmails();
 
+      const quota = await getQuotaStatus(req.user);
+      const requestResponse = connectionRequestData.toObject();
+      delete requestResponse.pairKey;
+      requestResponse.quota = quota;
       return sendSuccess(
         res,
         200,
         `${req.user.firstName} ${req.user.lastName} has been ${status} successfully!`,
-        connectionRequestData,
+        requestResponse,
       );
     } catch (error) {
+      if (error instanceof DailyLimitError) {
+        return sendError(res, 429, error.message, {
+          usagePlan: "Basic",
+          isElite: false,
+          limit: BASIC_DAILY_REQUEST_LIMIT,
+          used: BASIC_DAILY_REQUEST_LIMIT,
+          remaining: 0,
+          resetAt: error.resetAt,
+        });
+      }
+      if (error?.code === 11000 && error?.keyPattern?.pairKey) {
+        return sendError(
+          res,
+          400,
+          "A request already exists between these users!",
+        );
+      }
       console.error("Error sending request:", error);
       return sendError(res, 500, "Error sending request.");
     }

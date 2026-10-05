@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const connectionRequestSchema = new mongoose.Schema(
   {
+    pairKey: {
+      type: String,
+      trim: true,
+      select: false,
+    },
     fromUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // reference to the User collection
@@ -27,6 +32,7 @@ const connectionRequestSchema = new mongoose.Schema(
 
 connectionRequestSchema.index({ fromUserId: 1 });
 connectionRequestSchema.index({ toUserId: 1 });
+connectionRequestSchema.index({ pairKey: 1 }, { unique: true, sparse: true });
 
 connectionRequestSchema.pre("save", async function () {
   const connectionRequest = this;
