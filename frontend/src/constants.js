@@ -20,7 +20,7 @@ export const USAGE_PLANS = [
   {
     name: "Elite",
     description: "More ways to get noticed and keep the conversation going.",
-    price: "₹200",
+    price: "₹199",
     billing: "per month",
     features: [
       {

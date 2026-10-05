@@ -1,3 +1,5 @@
+import { HTTP_URL_PATTERN } from "../../constants.js";
+
 const allowedEditFields = new Set([
   "firstName",
   "lastName",
@@ -9,8 +11,6 @@ const allowedEditFields = new Set([
   "location",
   "bio",
 ]);
-
-const urlRegex = /^https?:\/\/\S+$/i;
 
 export const validateProfileData = (data) => {
   const errors = {};
@@ -59,7 +59,7 @@ export const validateProfileData = (data) => {
   if (Object.hasOwn(data, "photoUrl") && data.photoUrl !== null) {
     if (
       typeof data.photoUrl !== "string" ||
-      !urlRegex.test(data.photoUrl.trim())
+      !HTTP_URL_PATTERN.test(data.photoUrl.trim())
     ) {
       errors.photoUrl = "Photo URL must be a valid HTTP or HTTPS URL.";
     } else if (data.photoUrl.trim().length > 2048) {

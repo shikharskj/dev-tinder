@@ -2,10 +2,11 @@ import mongoose from "mongoose";
 import validator from "validator";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const urlRegex = /^https?:\/\/\S+$/i;
-const bcryptHashRegex = /^\$2[aby]\$\d{2}\$/;
+import {
+  BCRYPT_HASH_PATTERN,
+  EMAIL_PATTERN,
+  HTTP_URL_PATTERN,
+} from "../../constants.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -30,7 +31,25 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       maxlength: 254,
-      match: [emailRegex, "Please provide a valid email address"],
+      match: [EMAIL_PATTERN, "Please provide a valid email address"],
+    },
+    usagePlan: {
+      type: String,
+      enum: ["Basic", "Elite"],
+      default: "Basic",
+      required: true,
+    },
+    razorpaySubscriptionId: {
+      type: String,
+      default: null,
+    },
+    eliteSubscriptionExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    subscriptionCreationKey: {
+      type: String,
+      default: null,
     },
     password: {
       type: String,
@@ -41,7 +60,7 @@ const userSchema = new mongoose.Schema(
       validate: {
         validator: function (value) {
           return (
-            bcryptHashRegex.test(value) ||
+            BCRYPT_HASH_PATTERN.test(value) ||
             validator.isStrongPassword(value, {
               minLength: 8,
               minLowercase: 1,
@@ -87,7 +106,7 @@ const userSchema = new mongoose.Schema(
       default:
         "https://i.pinimg.com/1200x/0b/97/6f/0b976f0a7aa1aa43870e1812eee5a55d.jpg",
       validate: {
-        validator: (value) => urlRegex.test(value),
+        validator: (value) => HTTP_URL_PATTERN.test(value),
         message: "photoUrl must be a valid HTTP or HTTPS URL",
       },
     },
@@ -136,7 +155,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (!this.isModified("password") || bcryptHashRegex.test(this.password)) {
+  if (!this.isModified("password") || BCRYPT_HASH_PATTERN.test(this.password)) {
     return;
   }
 

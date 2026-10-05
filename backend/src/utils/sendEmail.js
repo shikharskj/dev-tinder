@@ -1,4 +1,5 @@
 // import { SendEmailCommand } from "@aws-sdk/client-ses";
+// import { NAME_CONTROL_CHARACTERS_PATTERN } from "../../constants.js";
 // import { sesClient } from "./sesClient.js";
 
 // const run = async ({ toAddress, senderName }) => {
@@ -10,7 +11,7 @@
 //   }
 
 //   const name = String(senderName || "Someone")
-//     .replace(/[\r\n]+/g, " ")
+//     .replace(NAME_CONTROL_CHARACTERS_PATTERN, " ")
 //     .slice(0, 100);
 
 //   const command = new SendEmailCommand({
@@ -44,10 +45,15 @@
 
 
 import { SendEmailCommand } from "@aws-sdk/client-ses";
+import {
+  HTML_ESCAPE_PATTERN,
+  NAME_CONTROL_CHARACTERS_PATTERN,
+  WHITESPACE_PATTERN,
+} from "../../constants.js";
 import { sesClient } from "./sesClient.js";
 
 const escapeHtml = (value) =>
-  String(value).replace(/[&<>"']/g, (character) => {
+  String(value).replace(HTML_ESCAPE_PATTERN, (character) => {
     const entities = {
       "&": "&amp;",
       "<": "&lt;",
@@ -61,7 +67,7 @@ const escapeHtml = (value) =>
 
 const cleanName = (value, fallback) =>
   String(value || "")
-    .replace(/[\r\n\t]+/g, " ")
+    .replace(NAME_CONTROL_CHARACTERS_PATTERN, " ")
     .trim()
     .slice(0, 100) || fallback;
 
@@ -95,7 +101,7 @@ const run = async ({
   const recipient = cleanName(recipientName, "there");
 
   const initials = sender
-    .split(/\s+/)
+    .split(WHITESPACE_PATTERN)
     .slice(0, 2)
     .map((part) => Array.from(part)[0])
     .join("")

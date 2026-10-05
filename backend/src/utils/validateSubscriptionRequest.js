@@ -1,5 +1,3 @@
-import validator from "validator";
-
 export const sanitizeSubscriptionRequest = (data) => {
   if (
     data === null ||
@@ -11,34 +9,13 @@ export const sanitizeSubscriptionRequest = (data) => {
     return null;
   }
 
-  const allowedFields = ["firstName", "lastName", "email", "usagePlan"];
   if (
-    Object.keys(data).length !== allowedFields.length ||
-    Object.keys(data).some((field) => !allowedFields.includes(field))
+    Object.keys(data).length !== 1 ||
+    Object.keys(data)[0] !== "usagePlan" ||
+    data.usagePlan !== "Elite"
   ) {
     return null;
   }
 
-  const { firstName, lastName, email, usagePlan } = data;
-  if (
-    typeof firstName !== "string" ||
-    firstName.trim().length < 3 ||
-    firstName.trim().length > 100 ||
-    typeof lastName !== "string" ||
-    lastName.trim().length < 3 ||
-    lastName.trim().length > 100 ||
-    typeof email !== "string" ||
-    email.trim().length > 254 ||
-    !validator.isEmail(email.trim()) ||
-    usagePlan !== "Elite"
-  ) {
-    return null;
-  }
-
-  return {
-    firstName: firstName.trim(),
-    lastName: lastName.trim(),
-    email: email.trim().toLowerCase(),
-    usagePlan,
-  };
+  return { usagePlan: "Elite" };
 };

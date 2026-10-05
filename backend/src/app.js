@@ -25,6 +25,10 @@ app.use(
   }),
 );
 app.use(cookieParser());
+app.use(
+  "/payment/webhook",
+  express.raw({ type: "application/json", limit: "100kb" }),
+);
 app.use(express.json({ limit: "10kb" }));
 
 app.use(authRouter);

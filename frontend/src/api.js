@@ -40,10 +40,11 @@ async function request(path, options = {}) {
 
 export const api = {
   get: (path) => request(path),
-  post: (path, body) =>
+  post: (path, body, headers = {}) =>
     request(path, {
       method: "POST",
       body: JSON.stringify(body),
+      headers,
     }),
   patch: (path, body) =>
     request(path, {

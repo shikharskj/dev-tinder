@@ -1208,10 +1208,155 @@ button.skill-toggle[aria-pressed="true"] {
   color: #426053;
 }
 
+.premium-plan__action--upgrade {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.premium-plan__action--upgrade:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #ad3f2c;
+  box-shadow: 0 8px 18px rgb(199 79 56 / 22%);
+}
+
+.premium-plan__action--upgrade:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .premium-footnote {
   margin: 0;
   color: oklch(var(--bc) / 0.58);
   font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.premium-message {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid;
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.premium-message--error {
+  border-color: #e9bcb4;
+  background: #fff5f2;
+  color: #8f3424;
+}
+
+.premium-message--success {
+  justify-content: flex-start;
+  border-color: #c9ddbd;
+  background: #f2f8ee;
+  color: #315b3b;
+}
+
+.premium-message button {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.premium-billing-summary {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0 0 1.25rem;
+  border: 1px solid #eee4df;
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: #fcf8f6;
+}
+
+.premium-billing-summary > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.premium-billing-summary > div > span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #6f7771;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.premium-billing-summary strong {
+  color: #28362f;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.premium-billing-summary p {
+  margin: 0;
+  color: #69736d;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.premium-plan__pending {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  margin-top: auto;
+  border: 1px solid #e4e8e2;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: #f7f8f5;
+  color: #536159;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.premium-plan__pending > span,
+.premium-plan__pending button,
+.premium-security-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.premium-plan__pending button {
+  border: 0;
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.premium-plan__pending button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.premium-security-note {
+  margin: -0.35rem 0 0;
+  color: oklch(var(--bc) / 0.58);
+  font-size: 0.78rem;
   line-height: 1.5;
   text-align: center;
 }

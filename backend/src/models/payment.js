@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { EMAIL_PATTERN } from "../../constants.js";
 
 const paymentSchema = new mongoose.Schema(
   {
@@ -6,6 +7,7 @@ const paymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
     firstName: {
       type: String,
@@ -27,23 +29,56 @@ const paymentSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       maxlength: 254,
-      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      match: EMAIL_PATTERN,
     },
     usagePlan: {
       type: String,
       enum: ["Elite"],
       required: true,
     },
-    razorpaySubscriptionId: {
+    idempotencyKey: {
       type: String,
       required: true,
       unique: true,
+      trim: true,
+    },
+    creationStatus: {
+      type: String,
+      enum: ["creating", "created", "failed"],
+      default: "creating",
+      required: true,
+    },
+    razorpaySubscriptionId: {
+      type: String,
+      default: undefined,
+      unique: true,
+      sparse: true,
       trim: true,
     },
     razorpayPlanId: {
       type: String,
       required: true,
       trim: true,
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: {
+        validator: Number.isSafeInteger,
+        message: "Subscription amount must be an integer in paise.",
+      },
+    },
+    currency: {
+      type: String,
+      enum: ["INR"],
+      required: true,
+    },
+    totalBillingCycles: {
+      type: Number,
+      required: true,
+      default: 12,
+      min: 1,
     },
     subscriptionStatus: {
       type: String,
@@ -59,17 +94,30 @@ const paymentSchema = new mongoose.Schema(
       ],
       default: "created",
     },
+    accessGranted: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
     shortUrl: {
       type: String,
       trim: true,
     },
     subscriptionStartDate: {
       type: Date,
-      default: Date.now,
+      default: null,
+    },
+    nextBillingAt: {
+      type: Date,
+      default: null,
     },
     subscriptionExpiresIn: {
       type: Date,
-      required: true,
+      default: null,
+    },
+    lastProviderEventAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true },

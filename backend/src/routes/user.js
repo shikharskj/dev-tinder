@@ -2,7 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import User from "../models/user.js";
 import authenticateUser from "../middlewares/auth.js";
-import { UPDATE_FIELDS } from "../../constants.js";
+import { DIGITS_ONLY_PATTERN, UPDATE_FIELDS } from "../../constants.js";
 import { isValidUserId, sanitizeUserData } from "../utils/validation.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
@@ -192,7 +192,7 @@ userRouter.get("/feed", authenticateUser, async (req, res) => {
       return defaultValue;
     }
 
-    if (typeof value !== "string" || !/^\d+$/.test(value)) {
+    if (typeof value !== "string" || !DIGITS_ONLY_PATTERN.test(value)) {
       return null;
     }
 
