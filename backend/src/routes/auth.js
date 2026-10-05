@@ -1,3 +1,4 @@
+import { effectiveUsagePlan } from "../utils/subscription.js";
 import express from "express";
 import User from "../models/user.js";
 import { SIGNUP_FIELDS } from "../../constants.js";
@@ -31,6 +32,7 @@ authRouter.post("/signup", async (req, res) => {
     await user.save();
     const userData = user.toObject();
     delete userData.password;
+    userData.usagePlan = effectiveUsagePlan(user);
 
     return sendSuccess(
       res,
@@ -91,6 +93,7 @@ authRouter.post("/login", async (req, res) => {
 
     const userData = user.toObject();
     delete userData.password;
+    userData.usagePlan = effectiveUsagePlan(user);
 
     return sendSuccess(res, 200, "Login successful!", userData);
   } catch (error) {

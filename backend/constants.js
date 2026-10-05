@@ -23,11 +23,14 @@ export const UPDATE_FIELDS = [
   "skills",
 ];
 
+// Includes recoverable states: block a second billable subscription.
 export const ACTIVE_SUBSCRIPTION_STATUSES = [
   "created",
   "authenticated",
   "active",
   "pending",
+  "halted",
+  "paused",
 ];
 
 // Matches UUIDs accepted as idempotency keys for subscription creation.
