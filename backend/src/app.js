@@ -7,27 +7,37 @@ import authRouter from "./routes/auth.js";
 import profileRouter from "./routes/profile.js";
 import requestRouter from "./routes/request.js";
 import userRouter from "./routes/user.js";
+import paymentRouter from "./routes/payment.js";
 
-const app = express({
-  origin: "http://localhost:5174",
-  credentials: true,
-});
+const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5174";
+const port = Number(process.env.PORT || 7777);
 
-app.use(cors());
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error("PORT must be an integer between 1 and 65535.");
+}
+
+const app = express();
+
+app.use(
+  cors({
+    origin: frontendOrigin,
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
-// express.json() middleware is used to parse incoming JSON requests and make the data available in req.body
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 
 app.use(authRouter);
 app.use(profileRouter);
 app.use(requestRouter);
 app.use(userRouter);
+app.use(paymentRouter);
 
 const startServer = async () => {
   await connectDB();
 
-  app.listen(process.env.PORT, () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
   });
 };
 

@@ -11,5 +11,9 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "date-fns": "^4.4.0",
+    "node-cron": "^4.6.0"
   }
 }

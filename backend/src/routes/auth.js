@@ -1,8 +1,8 @@
 import express from "express";
 import User from "../models/user.js";
 import { SIGNUP_FIELDS } from "../../constants.js";
-import { sanitizeUserData } from "../../utils/validation.js";
-import { sendError, sendSuccess } from "../../utils/response.js";
+import { sanitizeUserData } from "../utils/validation.js";
+import { sendError, sendSuccess } from "../utils/response.js";
 
 const authRouter = express.Router();
 

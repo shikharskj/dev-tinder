@@ -3,8 +3,8 @@ import bcrypt from "bcrypt";
 import User from "../models/user.js";
 import authenticateUser from "../middlewares/auth.js";
 import { UPDATE_FIELDS } from "../../constants.js";
-import { isValidUserId, sanitizeUserData } from "../../utils/validation.js";
-import { sendError, sendSuccess } from "../../utils/response.js";
+import { isValidUserId, sanitizeUserData } from "../utils/validation.js";
+import { sendError, sendSuccess } from "../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
 
 const userRouter = express.Router();

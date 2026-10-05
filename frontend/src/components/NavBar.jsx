@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Code2,
   Compass,
+  CreditCard,
   Inbox,
   LogOut,
   UserRound,
@@ -14,6 +15,7 @@ const navigation = [
   { to: "/feed", label: "Discover", Icon: Compass },
   { to: "/requests", label: "Requests", Icon: Inbox },
   { to: "/connections", label: "Connections", Icon: UsersRound },
+  { to: "/enroll-premium", label: "Premium", Icon: CreditCard },
 ];
 
 function NavItem({ to, label, Icon, mobile = false }) {

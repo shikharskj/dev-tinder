@@ -1,8 +1,8 @@
 import express from "express";
 import authenticateUser from "../middlewares/auth.js";
 import User from "../models/user.js";
-import { validateProfileData } from "../../utils/validateProfileData.js";
-import { sendError, sendSuccess } from "../../utils/response.js";
+import { validateProfileData } from "../utils/validateProfileData.js";
+import { sendError, sendSuccess } from "../utils/response.js";
 
 const profileRouter = express.Router();
 

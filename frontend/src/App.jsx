@@ -10,6 +10,7 @@ import Connections from "./pages/Connections";
 import NotFound from "./pages/NotFound";
 import { GuestOnly, RequireAuth } from "./RouteGuards";
 import { AuthProvider } from "./AuthContext";
+import EnrollPremium from "./pages/EnrollPremium";
 
 const router = createBrowserRouter([
   {
@@ -62,6 +63,14 @@ const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <Connections />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "enroll-premium",
+        element: (
+          <RequireAuth>
+            <EnrollPremium />
           </RequireAuth>
         ),
       },
