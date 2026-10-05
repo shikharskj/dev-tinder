@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Code2,
@@ -6,6 +6,7 @@ import {
   CreditCard,
   Inbox,
   LogOut,
+  ShieldCheck,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -60,9 +61,53 @@ export default function NavBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [logoutError, setLogoutError] = useState("");
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutButtonRef = useRef(null);
+  const cancelLogoutButtonRef = useRef(null);
+  const loggingOutRef = useRef(false);
+  const logoutDialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!logoutConfirmationOpen) return undefined;
+
+    const logoutTrigger = logoutButtonRef.current;
+    cancelLogoutButtonRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !loggingOutRef.current) {
+        setLogoutConfirmationOpen(false);
+      } else if (event.key === "Tab") {
+        const controls = logoutDialogRef.current?.querySelectorAll(
+          "button:not(:disabled)",
+        );
+        if (!controls?.length) {
+          event.preventDefault();
+          return;
+        }
+
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      logoutTrigger?.focus();
+    };
+  }, [logoutConfirmationOpen]);
 
   async function handleLogout() {
     setLogoutError("");
+    loggingOutRef.current = true;
+    setLoggingOut(true);
     try {
       await logout();
       navigate("/", { replace: true });
@@ -71,6 +116,10 @@ export default function NavBar() {
         "You were signed out here, but the server could not confirm it.",
       );
       navigate("/", { replace: true });
+    } finally {
+      loggingOutRef.current = false;
+      setLoggingOut(false);
+      setLogoutConfirmationOpen(false);
     }
   }
 
@@ -137,9 +186,10 @@ export default function NavBar() {
                   </span>
                 </Link>
                 <button
+                  ref={logoutButtonRef}
                   type="button"
                   className="btn btn-ghost btn-square btn-sm"
-                  onClick={handleLogout}
+                  onClick={() => setLogoutConfirmationOpen(true)}
                   aria-label="Sign out"
                   title="Sign out"
                 >
@@ -171,6 +221,63 @@ export default function NavBar() {
               Dismiss
             </button>
           </div>
+        </div>
+      )}
+
+      {logoutConfirmationOpen && (
+        <div
+          className="logout-modal"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !loggingOut) {
+              setLogoutConfirmationOpen(false);
+            }
+          }}
+        >
+          <section
+            ref={logoutDialogRef}
+            className="logout-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-dialog-title"
+            aria-describedby="logout-dialog-description"
+          >
+            <div className="logout-dialog__icon">
+              <ShieldCheck size={25} aria-hidden="true" />
+            </div>
+            <p className="logout-dialog__eyebrow">Take a breather</p>
+            <h2 id="logout-dialog-title">Ready to sign out?</h2>
+            <p id="logout-dialog-description">
+              You can come back anytime. Your profile and connections will be
+              right here when you return.
+            </p>
+            <div className="logout-dialog__actions">
+              <button
+                ref={cancelLogoutButtonRef}
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setLogoutConfirmationOpen(false)}
+                disabled={loggingOut}
+              >
+                Stay signed in
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary logout-dialog__confirm"
+                onClick={handleLogout}
+                disabled={loggingOut}
+              >
+                {loggingOut ? (
+                  <span
+                    className="loading loading-spinner loading-sm"
+                    aria-label="Signing out"
+                  />
+                ) : (
+                  <LogOut size={17} aria-hidden="true" />
+                )}
+                {loggingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </div>
+          </section>
         </div>
       )}
 
