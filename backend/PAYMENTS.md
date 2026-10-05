@@ -80,6 +80,7 @@ Set an alert email. Configure test and live modes separately, with matching mode
 ## Access and event ordering
 
 - Authentication and status reads calculate access from `usagePlan` and a future expiry. They no longer mutate subscription records on expiry, so a renewal cannot be overwritten by an unrelated read.
+- Resumable checkout subscriptions are fetched from Razorpay before the server returns Checkout details. A missing ID or mismatched plan is surfaced for reconciliation instead of opening Checkout with a stale ID; a provider subscription that is no longer awaiting authorization is not offered again. New attempts retain the public Razorpay key ID used at creation, and checkout is blocked if the server key later changes. Test/live credentials and plan IDs must belong to the same account.
 - Billing status and entitlement are separate: a provider subscription can still be `active` while paid access has expired.
 - Subscription creation blocks halted/paused subscriptions too, because those can recover and bill again.
 - State changes and event completion commit together. Duplicate delivery is recognised by event ID/payload fingerprint.
@@ -106,17 +107,20 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
 
-`date-fns` already existed at the root; it is now also declared in backend dependencies so installing/deploying only the backend works. The integration reuses Express, Mongoose, Razorpay, date-fns, JWT and the existing API/response helpers. No new application library is introduced.
+Subscription timestamp validation and paid-access comparisons use `date-fns`, declared directly in the backend dependencies.
 
 Deploy the new frontend build and restart the backend with the updated environment. On the server, install from the backend lockfile before restarting PM2:
 
 ```bash
 cd /home/ubuntu/dev-tinder
-npm --prefix backend ci --omit=dev
-pm2 restart devTinde --update-env
+git pull
+cd backend
+npm ci --omit=dev
+pm2 restart devTinder-backend --update-env
+pm2 logs devTinder-backend --lines 50
 ```
 
-The backend manifest and lockfile both declare `date-fns`. Installing from the backend lockfile ensures runtime dependencies are available alongside `backend/src`; restarting without installing updated dependencies can leave PM2 running code whose imports are absent. Updating GitHub alone does not deploy the server.
+The backend manifest and lockfile include `date-fns`, so installing only the backend dependencies provides the runtime import. Use the PM2 process name shown by `pm2 list`; this server's process is `devTinder-backend`. If PM2 continues to show an errored or restarting process, inspect its error log before retrying. Updating GitHub alone does not deploy the server.
 
 Before live traffic, verify first authorization/charge, renewal, duplicate/concurrent deliveries, a deliberately failing user update, pause/resume, cancellation, expired access and an uncertain create outcome. Confirm failed transaction writes roll back and successful event completion is committed once. Check that the provider charge payload contains `subscription.entity`, `payment.entity`, billing dates and quantity.
 

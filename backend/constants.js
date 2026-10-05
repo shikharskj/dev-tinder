@@ -46,6 +46,16 @@ export const DIGITS_ONLY_PATTERN = /^\d+$/;
 // Basic email shape check used by the user and payment schemas.
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Reserved domains used in examples and tests cannot receive real email.
+export const PLACEHOLDER_EMAIL_DOMAINS = [
+  "example.com",
+  "example.net",
+  "example.org",
+  "invalid",
+  "localhost",
+  "test",
+];
+
 // Allows HTTP(S) URLs without whitespace.
 export const HTTP_URL_PATTERN = /^https?:\/\/\S+$/i;
 

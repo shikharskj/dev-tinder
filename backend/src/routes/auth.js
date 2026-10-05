@@ -2,13 +2,24 @@ import { effectiveUsagePlan } from "../utils/subscription.js";
 import express from "express";
 import User from "../models/user.js";
 import { SIGNUP_FIELDS } from "../../constants.js";
-import { sanitizeUserData } from "../utils/validation.js";
+import {
+  isPlaceholderEmailAddress,
+  sanitizeUserData,
+} from "../utils/validation.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import { dispatchPendingEmails, enqueueEmail } from "../utils/emailNotifications.js";
 
 const authRouter = express.Router();
 
 authRouter.post("/signup", async (req, res) => {
+  if (isPlaceholderEmailAddress(req.body?.email)) {
+    return sendError(
+      res,
+      400,
+      "Use a real email address. Example and test addresses cannot receive notifications.",
+    );
+  }
+
   const signupData = sanitizeUserData(req.body, SIGNUP_FIELDS);
   const requiredFields = [
     "firstName",

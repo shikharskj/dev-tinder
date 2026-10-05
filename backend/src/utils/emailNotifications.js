@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Resend } from "resend";
 import EmailOutbox from "../models/emailOutbox.js";
 import { renderEmail } from "../templates/index.js";
+import { isPlaceholderEmailAddress } from "./validation.js";
 
 const MAX_ATTEMPTS = 8;
 const LOCK_DURATION_MS = 60_000;
@@ -56,6 +57,13 @@ export async function enqueueEmail(
 }
 
 async function deliver(outboxEntry) {
+  if (isPlaceholderEmailAddress(outboxEntry.toAddress)) {
+    const invalidRecipient = new Error("Placeholder email recipient.");
+    invalidRecipient.name = "InvalidRecipientAddress";
+    invalidRecipient.statusCode = 422;
+    throw invalidRecipient;
+  }
+
   const config = getResendClient();
   if (!config) return false;
 
@@ -78,6 +86,8 @@ async function deliver(outboxEntry) {
   if (error) {
     const providerError = new Error("Resend rejected the email.");
     providerError.name = error.name || "ResendError";
+    providerError.statusCode =
+      error.statusCode ?? error.error?.statusCode ?? error.status;
     throw providerError;
   }
 
@@ -115,7 +125,21 @@ async function claimNextEmail() {
 }
 
 async function recordFailure(outboxEntry, error) {
-  const exhausted = outboxEntry.attempts >= MAX_ATTEMPTS;
+  const statusCode = [
+    error?.statusCode,
+    error?.status,
+    error?.error?.statusCode,
+    error?.error?.status,
+  ].find(Number.isInteger);
+  const permanentRejection =
+    error?.name === "validation_error" ||
+    (Number.isInteger(statusCode) &&
+      statusCode >= 400 &&
+      statusCode < 500 &&
+      statusCode !== 408 &&
+      statusCode !== 429);
+  const exhausted =
+    permanentRejection || outboxEntry.attempts >= MAX_ATTEMPTS;
   const delay = Math.min(
     30_000 * 2 ** Math.max(0, outboxEntry.attempts - 1),
     MAX_BACKOFF_MS,
@@ -138,6 +162,7 @@ async function recordFailure(outboxEntry, error) {
     template: outboxEntry.template,
     attempt: outboxEntry.attempts,
     retrying: !exhausted,
+    ...(Number.isInteger(statusCode) ? { statusCode } : {}),
     errorName: error?.name || "EmailDeliveryError",
   });
 }

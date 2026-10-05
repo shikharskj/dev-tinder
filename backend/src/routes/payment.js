@@ -74,7 +74,7 @@ const handle = (label, handler) => async (req, res) => {
 
 function checkoutResponse(payment) {
   return {
-    keyId: process.env.RAZORPAY_KEY_ID,
+    keyId: payment.razorpayKeyId || process.env.RAZORPAY_KEY_ID,
     subscriptionId: payment.razorpaySubscriptionId,
     customer: {
       name: [payment.firstName, payment.lastName].filter(Boolean).join(" "),
@@ -113,6 +113,50 @@ function getProvider() {
   return createRazorpayInstance(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET);
 }
 
+async function validateCheckoutSubscription(payment) {
+  if (
+    payment.razorpayKeyId &&
+    payment.razorpayKeyId !== process.env.RAZORPAY_KEY_ID
+  ) {
+    fail(
+      409,
+      "This saved checkout was created with a different Razorpay key. Restore the matching account and mode credentials or contact support to reconcile it before paying.",
+    );
+  }
+
+  const provider = getProvider();
+  let subscription;
+
+  try {
+    subscription = await provider.subscriptions.fetch(
+      payment.razorpaySubscriptionId,
+    );
+  } catch (error) {
+    if (error?.statusCode === 404) {
+      fail(
+        409,
+        "This saved checkout does not exist in the configured Razorpay account or mode. Verify that the server key, secret, and plan all use the same test or live account, then contact support to reconcile this subscription.",
+      );
+    }
+    if ([401, 403].includes(error?.statusCode)) {
+      fail(
+        503,
+        "Razorpay rejected the configured credentials. Verify the matching account and mode keys.",
+      );
+    }
+    throw error;
+  }
+
+  if (subscription.plan_id !== payment.razorpayPlanId) {
+    fail(
+      409,
+      "This saved checkout uses a different Razorpay plan. Contact support to reconcile it before paying.",
+    );
+  }
+
+  return subscription.status === "created";
+}
+
 function releaseCreationLock(userId, key, session) {
   return User.updateOne(
     { _id: userId, subscriptionCreationKey: key },
@@ -134,6 +178,7 @@ async function saveCreatedSubscription(attempt, subscription) {
     {
       $set: {
         razorpaySubscriptionId: subscription.id,
+        razorpayKeyId: attempt.razorpayKeyId || process.env.RAZORPAY_KEY_ID,
         shortUrl: subscription.short_url,
         creationStatus: "created",
       },
@@ -214,6 +259,10 @@ paymentRouter.get(
       !active &&
       process.env.RAZORPAY_KEY_ID;
 
+    const checkoutReady = canCheckout
+      ? await validateCheckoutSubscription(payment)
+      : false;
+
     return sendSuccess(res, 200, "Subscription status fetched.", {
       usagePlan: active ? "Elite" : "Basic",
       creationStatus: payment?.creationStatus ?? null,
@@ -223,7 +272,7 @@ paymentRouter.get(
           : (payment?.subscriptionStatus ?? null),
       expiresAt: active ? user.eliteSubscriptionExpiresAt : null,
       nextBillingAt: payment?.nextBillingAt ?? null,
-      checkout: canCheckout ? checkoutResponse(payment) : null,
+      checkout: checkoutReady ? checkoutResponse(payment) : null,
     });
   }),
 );
@@ -270,6 +319,15 @@ paymentRouter.post(
           409,
           "This subscription has ended. Start a new checkout with a new request key.",
         );
+      }
+
+      if (existing.subscriptionStatus === "created") {
+        if (!(await validateCheckoutSubscription(existing))) {
+          fail(
+            409,
+            "This Razorpay subscription is no longer awaiting checkout. Refresh status before starting another payment.",
+          );
+        }
       }
 
       await releaseCreationLock(userId, key);
@@ -333,6 +391,15 @@ paymentRouter.post(
           fail(409, "A subscription request is still being reconciled.");
         }
 
+        if (current.subscriptionStatus === "created") {
+          if (!(await validateCheckoutSubscription(current))) {
+            fail(
+              409,
+              "This Razorpay subscription is no longer awaiting checkout. Refresh status before starting another payment.",
+            );
+          }
+        }
+
         return sendSuccess(
           res,
           200,
@@ -348,6 +415,7 @@ paymentRouter.post(
         email: req.user.email,
         usagePlan: "Elite",
         idempotencyKey: key,
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
         razorpayPlanId: planId,
         amount: ELITE.amount,
         currency: ELITE.currency,

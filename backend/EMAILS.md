@@ -38,8 +38,14 @@ Changes that trigger an email write a uniquely keyed record into MongoDB's
 subscription change. This prevents notification-provider downtime from
 reversing the user action. The worker claims pending records, uses Resend
 idempotency keys, retries failures with exponential backoff, and marks records
-failed after eight attempts. Failed records should be monitored and reviewed
-before being retried operationally.
+failed after eight attempts. Permanent Resend client errors (4xx, other than
+timeouts and rate limits) and `validation_error` responses are failed
+immediately rather than retried, including responses where the SDK nests the
+HTTP status. A
+recipient must be a real address; reserved example/test domains are rejected
+during signup and are rejected before calling Resend. For existing accounts,
+update the account email and the recipient stored on any failed outbox record
+before manually retrying delivery; outbox recipients are event-time snapshots.
 
 The outbox contains recipient addresses and the small amount of event data
 needed by a template. Restrict production database access and apply the same

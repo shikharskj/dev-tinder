@@ -1,10 +1,21 @@
 import mongoose from "mongoose";
+import { PLACEHOLDER_EMAIL_DOMAINS } from "../../constants.js";
 
 export const isPlainObject = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 export const isValidUserId = (userId) =>
   mongoose.Types.ObjectId.isValid(userId);
+
+export const isPlaceholderEmailAddress = (email) => {
+  if (typeof email !== "string") return false;
+
+  const domain = email.trim().toLowerCase().split("@").at(-1);
+  return PLACEHOLDER_EMAIL_DOMAINS.some(
+    (placeholder) =>
+      domain === placeholder || domain.endsWith(`.${placeholder}`),
+  );
+};
 
 export const sanitizeUserData = (data, allowedFields) => {
   if (!isPlainObject(data)) return null;

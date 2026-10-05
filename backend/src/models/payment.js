@@ -55,6 +55,10 @@ const paymentSchema = new mongoose.Schema(
       sparse: true,
       trim: true,
     },
+    razorpayKeyId: {
+      type: String,
+      trim: true,
+    },
     razorpayPlanId: {
       type: String,
       required: true,
