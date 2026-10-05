@@ -138,7 +138,7 @@ async function saveCreatedSubscription(attempt, subscription) {
         creationStatus: "created",
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 
   if (!saved)

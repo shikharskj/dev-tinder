@@ -66,7 +66,7 @@ profileRouter.patch("/profile/edit", authenticateUser, async (req, res) => {
     if (clearPhoto) update.$unset = { photoUrl: 1 };
 
     const updatedUser = await User.findByIdAndUpdate(user._id, update, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     }).select("-password");
 

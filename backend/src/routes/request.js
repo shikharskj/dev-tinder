@@ -120,7 +120,7 @@ requestRouter.post(
               status: "interested",
             },
             { $set: { status } },
-            { new: true, runValidators: true, session },
+            { returnDocument: "after", runValidators: true, session },
           );
 
           if (!request) return null;

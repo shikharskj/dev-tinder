@@ -101,7 +101,6 @@ After reviewing and merging the pull request:
 
 ```bash
 npm --prefix backend ci
-npm --prefix backend test
 npm --prefix frontend ci
 npm --prefix frontend run lint
 npm --prefix frontend run build
@@ -109,11 +108,17 @@ npm --prefix frontend run build
 
 `date-fns` already existed at the root; it is now also declared in backend dependencies so installing/deploying only the backend works. The integration reuses Express, Mongoose, Razorpay, date-fns, JWT and the existing API/response helpers. No new application library is introduced.
 
-Deploy the new frontend build and restart the backend with your existing process manager and updated environment. Updating GitHub alone does not deploy the server.
+Deploy the new frontend build and restart the backend with the updated environment. On the server, install from the backend lockfile before restarting PM2:
 
-Validation performed: 20 tests using the actual Express router, installed SDK and schema validation, with database/provider I/O mocked; frontend production build and lint passed. Tests cover callback signatures and ownership, raw-body webhooks, amount/plan validation, replay, session propagation, malformed payloads, expiry, state ordering, failure paths and create timeout recovery.
+```bash
+cd /home/ubuntu/dev-tinder
+npm --prefix backend ci --omit=dev
+pm2 restart devTinde --update-env
+```
 
-A real MongoDB transaction/concurrency test and Razorpay test-mode payment were **not** run here. Before live traffic, verify: first authorization/charge, a renewal, duplicate/concurrent deliveries, deliberately failing a user update, pause/resume, cancel, expired access and an uncertain create outcome. Verify failed transaction writes roll back and successful event completion is committed once. Check the expected full charge payload contains `subscription.entity`, `payment.entity`, billing dates and quantity.
+The backend manifest and lockfile both declare `date-fns`. Installing from the backend lockfile ensures runtime dependencies are available alongside `backend/src`; restarting without installing updated dependencies can leave PM2 running code whose imports are absent. Updating GitHub alone does not deploy the server.
+
+Before live traffic, verify first authorization/charge, renewal, duplicate/concurrent deliveries, a deliberately failing user update, pause/resume, cancellation, expired access and an uncertain create outcome. Confirm failed transaction writes roll back and successful event completion is committed once. Check that the provider charge payload contains `subscription.entity`, `payment.entity`, billing dates and quantity.
 
 ## Remaining product work
 
