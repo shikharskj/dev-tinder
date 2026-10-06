@@ -4,10 +4,12 @@ import { Link, useParams } from "react-router-dom";
 import ChatHeader from "../components/ChatHeader";
 import ChatSettings from "../components/ChatSettings";
 import ContactSheet from "../components/ContactSheet";
-import ImageLightbox from "../components/ImageLightbox";
+import MediaViewer from "../components/MediaViewer";
 import MessageActionSheet from "../components/MessageActionSheet";
-import useImageUpload from "../hooks/useImageUpload";
-import useMessageActions from "../hooks/useMessageActions";
+import useMediaUpload from "../hooks/useMediaUpload";
+import useMessageActions, {
+  DELETE_FOR_EVERYONE_WINDOW_MS,
+} from "../hooks/useMessageActions";
 import MessageComposer from "../components/MessageComposer";
 import MessageList from "../components/MessageList";
 import ReportForm from "../components/ReportForm";
@@ -58,7 +60,7 @@ export default function ChatRoom() {
   const [reportOpen, setReportOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
-  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [viewerMedia, setViewerMedia] = useState(null);
   const [showJump, setShowJump] = useState(false);
   const [newCount, setNewCount] = useState(0);
   const [firstUnreadId, setFirstUnreadId] = useState(null);
@@ -111,11 +113,13 @@ export default function ChatRoom() {
     setError: conversation.setError,
   });
 
-  const { imageUploadsEnabled, sendImage } = useImageUpload({
+  const { mediaUploadsEnabled, sendMedia, cancelUpload } = useMediaUpload({
     chat: conversation.chat,
     userId,
     replyTo,
     setReplyTo,
+    draft,
+    setDraft,
     setMessages,
     setError: conversation.setError,
     shouldScrollToBottomRef,
@@ -126,7 +130,13 @@ export default function ChatRoom() {
     setReplyTo({
       _id: message._id,
       senderId: message.senderId,
-      text: message.text || (message.attachment ? "📷 Photo" : ""),
+      text:
+        message.text ||
+        (message.attachment
+          ? message.attachment.kind === "video"
+            ? "🎥 Video"
+            : "📷 Photo"
+          : ""),
     });
     document.querySelector(".chat-composer__input")?.focus();
   }
@@ -395,7 +405,17 @@ export default function ChatRoom() {
             onReply={startReply}
             onReact={(message, emoji) => void reactToMessage(message, emoji)}
             onJumpTo={jumpToMessage}
-            onOpenImage={setLightboxSrc}
+            onOpenMedia={(attachment, message) =>
+              setViewerMedia({
+                ...attachment,
+                message,
+                canDelete:
+                  String(message.senderId) === String(userId) &&
+                  Date.now() - new Date(message.createdAt).getTime() <
+                    DELETE_FOR_EVERYONE_WINDOW_MS,
+              })
+            }
+            onCancelUpload={cancelUpload}
           />
           {showJump && (
             <button
@@ -428,8 +448,8 @@ export default function ChatRoom() {
             void sendMessage();
           }}
           onUnblock={() => void toggleBlock()}
-          imageUploadsEnabled={imageUploadsEnabled}
-          onPickImage={(file) => void sendImage(file)}
+          mediaUploadsEnabled={mediaUploadsEnabled}
+          onPickMedia={(file) => void sendMedia(file)}
           replyTo={replyTo}
           replyAuthor={
             replyTo && String(replyTo.senderId) === String(userId)
@@ -462,7 +482,24 @@ export default function ChatRoom() {
           setActionMessage(null);
         }}
       />
-      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      <MediaViewer
+        media={viewerMedia}
+        onClose={() => setViewerMedia(null)}
+        onDelete={
+          viewerMedia?.canDelete && !chat.readOnly
+            ? () => {
+                if (
+                  window.confirm(
+                    `Delete this ${viewerMedia.kind === "video" ? "video" : "photo"} for everyone? This can’t be undone.`,
+                  )
+                ) {
+                  void deleteMessage(viewerMedia.message, "everyone");
+                  setViewerMedia(null);
+                }
+              }
+            : undefined
+        }
+      />
       <ContactSheet
         open={contactOpen}
         target={target}

@@ -474,7 +474,7 @@ chatRouter.post(
   },
 );
 
-// Requesting a short-lived presigned URL to upload one chat image
+// Requesting a short-lived signature to upload one chat photo or video
 chatRouter.post(
   "/chat/conversations/:conversationId/attachments",
   authenticateUser,
@@ -497,20 +497,21 @@ chatRouter.post(
       );
       const access = await getChatAccess(req.user._id, otherUserId);
       if (!access.accepted || access.blocked) {
-        return sendError(res, 403, "You can’t send images in this conversation.");
+        return sendError(res, 403, "You can’t send media in this conversation.");
       }
       enforceUploadRateLimit(req.user._id);
 
       const target = await createUploadTarget(
         String(conversation._id),
+        req.body?.kind,
         req.body?.contentType,
         req.body?.size,
       );
-      return sendSuccess(res, 201, "Upload URL created.", target);
+      return sendSuccess(res, 201, "Upload signature created.", target);
     } catch (error) {
       if (error.status) return sendError(res, error.status, error.message);
       console.error("Error creating attachment upload:", error);
-      return sendError(res, 500, "Unable to prepare the image upload.");
+      return sendError(res, 500, "Unable to prepare the upload.");
     }
   },
 );
@@ -518,6 +519,7 @@ chatRouter.post(
 chatRouter.get("/chat/capabilities", authenticateUser, (req, res) =>
   sendSuccess(res, 200, "Chat capabilities fetched.", {
     imageUploads: attachmentsEnabled(),
+    videoUploads: attachmentsEnabled(),
   }),
 );
 

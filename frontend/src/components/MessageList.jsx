@@ -23,7 +23,8 @@ export default function MessageList({
   onReply,
   onReact,
   onJumpTo,
-  onOpenImage,
+  onOpenMedia,
+  onCancelUpload,
 }) {
   const timeline = useMemo(
     () => buildTimeline(messages, { currentUserId, firstUnreadId }),
@@ -127,7 +128,8 @@ export default function MessageList({
                 onReply={onReply}
                 onReact={onReact}
                 onJumpTo={onJumpTo}
-                onOpenImage={onOpenImage}
+                onOpenMedia={onOpenMedia}
+                onCancelUpload={onCancelUpload}
               />
             ) : (
               <div className="msg-row">
@@ -154,7 +156,8 @@ export default function MessageList({
                   onReply={onReply}
                   onReact={onReact}
                   onJumpTo={onJumpTo}
-                  onOpenImage={onOpenImage}
+                  onOpenMedia={onOpenMedia}
+                  onCancelUpload={onCancelUpload}
                 />
               </div>
             )}

@@ -1,7 +1,102 @@
 import { memo, useMemo, useRef, useState } from "react";
-import { Ban, Check, CheckCheck, ChevronDown, Clock } from "lucide-react";
+import {
+  Ban,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  Clock,
+  Play,
+  X,
+} from "lucide-react";
 import { formatMessageTime } from "../utils/helpers";
 import LinkPreview from "./LinkPreview";
+
+function formatDuration(seconds) {
+  if (!seconds) return "";
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function MediaThumb({ attachment, pending, progress, onOpen, onCancel }) {
+  const isVideo = attachment.kind === "video";
+  const poster = attachment.thumbUrl || attachment.posterUrl;
+  const percent = Math.round((progress || 0) * 100);
+  const [loaded, setLoaded] = useState(false);
+  const [broken, setBroken] = useState(false);
+  const ratio =
+    attachment.width && attachment.height
+      ? Math.min(1.78, Math.max(0.8, attachment.width / attachment.height))
+      : 1.33;
+
+  return (
+    <div
+      className={`chat-media${loaded || broken ? "" : " is-loading"}`}
+      style={{ aspectRatio: ratio }}
+    >
+      <button
+        type="button"
+        className="chat-media__open"
+        onClick={onOpen}
+        disabled={pending}
+        aria-label={isVideo ? "Play video" : "Open photo"}
+      >
+        {isVideo && !poster ? (
+          <video
+            src={`${attachment.url}#t=0.1`}
+            preload="metadata"
+            muted
+            playsInline
+            onLoadedData={() => setLoaded(true)}
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <img
+            src={poster || attachment.url}
+            alt={isVideo ? "Video preview" : "Shared photo"}
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            onError={() => setBroken(true)}
+          />
+        )}
+        {isVideo && !pending && (
+          <span className="chat-media__play" aria-hidden="true">
+            <Play size={22} fill="currentColor" />
+          </span>
+        )}
+        {isVideo && attachment.duration > 0 && !pending && (
+          <span className="chat-media__duration">
+            {formatDuration(attachment.duration)}
+          </span>
+        )}
+      </button>
+      {broken && <span className="chat-media__broken">Media unavailable</span>}
+      {pending && (
+        <div className="chat-media__progress" role="status">
+          <span className="sr-only">Uploading {percent}%</span>
+          <span
+            className="radial-progress text-primary-content"
+            style={{
+              "--value": percent,
+              "--size": "2.75rem",
+              "--thickness": "3px",
+            }}
+            aria-hidden="true"
+          >
+            {percent}
+          </span>
+          <button
+            type="button"
+            className="btn btn-circle btn-xs chat-media__cancel"
+            onClick={onCancel}
+            aria-label="Cancel upload"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Linkified({ text }) {
   return text.split(/(https?:\/\/[^\s<>"']+)/gi).map((part, index) =>
@@ -48,7 +143,8 @@ function MessageBubble({
   onReply,
   onReact,
   onJumpTo,
-  onOpenImage,
+  onOpenMedia,
+  onCancelUpload,
 }) {
   const [offset, setOffset] = useState(0);
   const gesture = useRef(null);
@@ -107,7 +203,7 @@ function MessageBubble({
     setOffset(0);
   }
 
-  const className = `chat-message${message.pending ? " is-pending" : ""}${own ? " is-own" : ""}${message.failed ? " is-failed" : ""}${groupStart ? " is-group-start" : ""}${groupEnd ? " is-group-end" : ""}${message.deleted ? " is-deleted" : ""}${reactions.length ? " has-reactions" : ""}`;
+  const className = `chat-message${message.pending ? " is-pending" : ""}${own ? " is-own" : ""}${message.failed ? " is-failed" : ""}${groupStart ? " is-group-start" : ""}${groupEnd ? " is-group-end" : ""}${message.deleted ? " is-deleted" : ""}${message.attachment?.url && !message.deleted ? (message.text ? " has-media" : " is-media") : ""}${reactions.length ? " has-reactions" : ""}`;
 
   return (
     <article
@@ -163,18 +259,13 @@ function MessageBubble({
       ) : (
         <>
           {message.attachment?.url && (
-            <button
-              type="button"
-              className="chat-image"
-              onClick={() => onOpenImage(message.attachment.url)}
-              aria-label="Open image"
-            >
-              <img
-                src={message.attachment.url}
-                alt="Shared in chat"
-                loading="lazy"
-              />
-            </button>
+            <MediaThumb
+              attachment={message.attachment}
+              pending={message.pending}
+              progress={message.uploadProgress}
+              onOpen={() => onOpenMedia(message.attachment, message)}
+              onCancel={() => onCancelUpload?.(message.clientMessageId)}
+            />
           )}
           {message.text && (
             <span className="chat-message__text">

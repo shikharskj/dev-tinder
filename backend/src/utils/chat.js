@@ -217,7 +217,9 @@ export async function persistMessage({
         lastMessage: {
           text: message.text
             ? message.text.slice(0, 180)
-            : "📷 Photo",
+            : message.attachment?.resourceType === "video"
+              ? "🎥 Video"
+              : "📷 Photo",
           senderId,
           createdAt: message.createdAt,
         },

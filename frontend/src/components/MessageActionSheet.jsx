@@ -32,6 +32,11 @@ export default function MessageActionSheet({
     !readOnly &&
     (message?.openedAt || 0) - new Date(message?.createdAt || 0).getTime() <
       DELETE_FOR_EVERYONE_WINDOW_MS;
+  const mediaLabel = message?.attachment
+    ? message.attachment.kind === "video"
+      ? "video"
+      : "photo"
+    : "message";
   const myReaction = message?.reactions?.find(
     (reaction) => String(reaction.userId) === String(currentUserId),
   )?.emoji;
@@ -80,7 +85,7 @@ export default function MessageActionSheet({
           )}
           <li>
             <button type="button" onClick={() => onDelete("me")}>
-              <UserRoundX size={18} aria-hidden="true" /> Delete for me
+              <UserRoundX size={18} aria-hidden="true" /> Delete {mediaLabel} for me
             </button>
           </li>
           {canDeleteForEveryone && (
@@ -88,9 +93,18 @@ export default function MessageActionSheet({
               <button
                 type="button"
                 className="text-error"
-                onClick={() => onDelete("everyone")}
+                onClick={() => {
+                  if (
+                    !message?.attachment ||
+                    window.confirm(
+                      `Delete this ${mediaLabel} for everyone? This can’t be undone.`,
+                    )
+                  ) {
+                    onDelete("everyone");
+                  }
+                }}
               >
-                <Trash2 size={18} aria-hidden="true" /> Delete for everyone
+                <Trash2 size={18} aria-hidden="true" /> Delete {mediaLabel} for everyone
               </button>
             </li>
           )}

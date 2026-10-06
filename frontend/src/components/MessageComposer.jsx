@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from "react";
-import { ImagePlus, Send, ShieldOff, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Camera, ImagePlus, Plus, Send, ShieldOff, X } from "lucide-react";
 
 export default function MessageComposer({
   readOnly,
@@ -10,14 +10,43 @@ export default function MessageComposer({
   onDraftKeyDown,
   onSend,
   onUnblock,
-  imageUploadsEnabled,
-  onPickImage,
+  mediaUploadsEnabled,
+  onPickMedia,
   replyTo,
   replyAuthor,
   onCancelReply,
 }) {
   const textareaRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const libraryInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const attachRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const close = (event) => {
+      if (event.type === "keydown" && event.key !== "Escape") return;
+      if (
+        event.type === "pointerdown" &&
+        attachRef.current?.contains(event.target)
+      )
+        return;
+      setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [menuOpen]);
+
+  const handleFile = (event) => {
+    const [file] = event.target.files;
+    event.target.value = "";
+    setMenuOpen(false);
+    if (file) onPickMedia(file);
+  };
 
   // Grow with content up to ~5 lines, then scroll.
   useLayoutEffect(() => {
@@ -73,30 +102,57 @@ export default function MessageComposer({
           onSend();
         }}
       >
-        {imageUploadsEnabled && (
-          <>
+        {mediaUploadsEnabled && (
+          <div className="chat-attach" ref={attachRef}>
             <input
-              ref={fileInputRef}
+              ref={libraryInputRef}
               className="sr-only"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
               tabIndex={-1}
               aria-hidden="true"
-              onChange={(event) => {
-                const [file] = event.target.files;
-                event.target.value = "";
-                if (file) onPickImage(file);
-              }}
+              onChange={handleFile}
+            />
+            <input
+              ref={cameraInputRef}
+              className="sr-only"
+              type="file"
+              accept="image/*,video/*"
+              capture="environment"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={handleFile}
             />
             <button
-              className="btn btn-ghost btn-circle chat-composer__attach"
+              className={`btn btn-ghost btn-circle chat-composer__attach${menuOpen ? " is-open" : ""}`}
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Send an image"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Attach photo or video"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
-              <ImagePlus size={20} aria-hidden="true" />
+              <Plus size={22} aria-hidden="true" />
             </button>
-          </>
+            {menuOpen && (
+              <div className="chat-attach__menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  autoFocus
+                  onClick={() => libraryInputRef.current?.click()}
+                >
+                  <ImagePlus size={18} aria-hidden="true" /> Photo or video
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <Camera size={18} aria-hidden="true" /> Camera
+                </button>
+              </div>
+            )}
+          </div>
         )}
         <textarea
           ref={textareaRef}

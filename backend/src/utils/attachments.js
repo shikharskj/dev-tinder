@@ -1,34 +1,46 @@
 import crypto from "node:crypto";
-import {
-  GetObjectCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { v2 as cloudinary } from "cloudinary";
 
-export const ATTACHMENT_TYPES = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
+const MB = 1024 * 1024;
+
+export const MEDIA_KINDS = {
+  image: {
+    resourceType: "image",
+    formats: { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" },
+    maxBytes: 10 * MB,
+    message: "Photos must be JPEG, PNG or WebP and 10 MB or smaller.",
+  },
+  video: {
+    resourceType: "video",
+    formats: { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm" },
+    maxBytes: 50 * MB,
+    maxDuration: 60,
+    message: "Videos must be MP4, MOV or WebM, 50 MB or smaller and up to 60 seconds.",
+  },
 };
-export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-const UPLOAD_URL_TTL_SECONDS = 120;
-const VIEW_URL_TTL_SECONDS = 3600;
 
-let client = null;
-
-function bucket() {
-  return process.env.S3_CHAT_BUCKET || "";
-}
+const SIGNATURE_TTL_SECONDS = 120;
+let configured = false;
 
 export function attachmentsEnabled() {
-  return Boolean(bucket() && process.env.AWS_REGION);
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET,
+  );
 }
 
-function s3() {
-  client ||= new S3Client({ region: process.env.AWS_REGION });
-  return client;
+function sdk() {
+  if (!configured) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+    });
+    configured = true;
+  }
+  return cloudinary;
 }
 
 function fail(message, status) {
@@ -37,78 +49,145 @@ function fail(message, status) {
   return error;
 }
 
-export function attachmentKeyBelongsTo(key, conversationId) {
+function folderFor(conversationId) {
+  return `devtinder/chat/${conversationId}`;
+}
+
+export function publicIdBelongsTo(publicId, conversationId) {
   return (
-    typeof key === "string" &&
-    new RegExp(`^chat/${conversationId}/[0-9a-f-]{36}\\.(jpg|png|webp)$`).test(
-      key,
-    )
+    typeof publicId === "string" &&
+    new RegExp(`^devtinder/chat/${conversationId}/[0-9a-f-]{36}$`).test(publicId)
   );
 }
 
-export async function createUploadTarget(conversationId, contentType, size) {
-  if (!attachmentsEnabled()) {
-    throw fail("Image sharing isn’t configured.", 501);
-  }
-  const extension = ATTACHMENT_TYPES[contentType];
-  if (!extension) throw fail("Only JPEG, PNG or WebP images are allowed.", 400);
-  if (!Number.isInteger(size) || size <= 0 || size > MAX_ATTACHMENT_BYTES) {
-    throw fail("Images must be 5 MB or smaller.", 400);
+// Signs one upload. The browser cannot change the asset path, type or delivery mode.
+export function createUploadTarget(conversationId, kind, contentType, size) {
+  if (!attachmentsEnabled()) throw fail("Media sharing isn’t configured.", 501);
+  const rules = MEDIA_KINDS[kind];
+  if (
+    !rules ||
+    !Object.values(rules.formats).includes(contentType) ||
+    !Number.isInteger(size) ||
+    size <= 0 ||
+    size > rules.maxBytes
+  ) {
+    throw fail(rules?.message || "Choose a photo or a video.", 400);
   }
 
-  const key = `chat/${conversationId}/${crypto.randomUUID()}.${extension}`;
-  const uploadUrl = await getSignedUrl(
-    s3(),
-    new PutObjectCommand({
-      Bucket: bucket(),
-      Key: key,
-      ContentType: contentType,
-      ContentLength: size,
-    }),
-    { expiresIn: UPLOAD_URL_TTL_SECONDS },
+  const publicId = `${folderFor(conversationId)}/${crypto.randomUUID()}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = { public_id: publicId, timestamp, type: "authenticated" };
+  const signature = sdk().utils.api_sign_request(
+    params,
+    process.env.CLOUDINARY_API_SECRET,
   );
-  return { key, uploadUrl, expiresIn: UPLOAD_URL_TTL_SECONDS };
+
+  return {
+    uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${rules.resourceType}/upload`,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    ...params,
+    signature,
+    publicId,
+    resourceType: rules.resourceType,
+    expiresIn: SIGNATURE_TTL_SECONDS,
+  };
 }
 
-// Confirms the browser really uploaded the object and that it matches limits.
-export async function verifyAttachment(key) {
+export async function deleteMedia(attachment) {
+  if (!attachmentsEnabled() || !attachment?.publicId) return;
   try {
-    const head = await s3().send(
-      new HeadObjectCommand({ Bucket: bucket(), Key: key }),
-    );
-    if (
-      !ATTACHMENT_TYPES[head.ContentType] ||
-      !head.ContentLength ||
-      head.ContentLength > MAX_ATTACHMENT_BYTES
-    ) {
-      throw fail("Invalid image attachment.", 400);
-    }
-    return { contentType: head.ContentType, size: head.ContentLength };
+    await sdk().uploader.destroy(attachment.publicId, {
+      resource_type: attachment.resourceType,
+      type: "authenticated",
+      invalidate: true,
+    });
   } catch (error) {
-    if (error.status) throw error;
-    throw fail("Image upload was not completed.", 400);
+    console.error("Unable to delete media:", error?.message);
   }
 }
 
+// Confirms the browser really uploaded the asset and that it matches limits.
+export async function verifyAttachment(publicId, kind) {
+  const rules = MEDIA_KINDS[kind];
+  if (!rules) throw fail("Invalid attachment.", 400);
+
+  let asset;
+  try {
+    asset = await sdk().api.resource(publicId, {
+      resource_type: rules.resourceType,
+      type: "authenticated",
+    });
+  } catch {
+    throw fail("The upload was not completed.", 400);
+  }
+
+  const contentType = rules.formats[String(asset.format || "").toLowerCase()];
+  const invalid =
+    !contentType ||
+    !asset.bytes ||
+    asset.bytes > rules.maxBytes ||
+    (rules.maxDuration && !(asset.duration > 0 && asset.duration <= rules.maxDuration + 0.5));
+  if (invalid) {
+    await deleteMedia({ publicId, resourceType: rules.resourceType });
+    throw fail(rules.message, 400);
+  }
+
+  return {
+    publicId,
+    resourceType: rules.resourceType,
+    format: String(asset.format).toLowerCase(),
+    contentType,
+    size: asset.bytes,
+    width: asset.width || undefined,
+    height: asset.height || undefined,
+    duration: asset.duration || undefined,
+  };
+}
+
+function deliveryUrl(attachment, options = {}) {
+  return sdk().url(attachment.publicId, {
+    resource_type: attachment.resourceType,
+    type: "authenticated",
+    sign_url: true,
+    secure: true,
+    ...options,
+  });
+}
+
+function urlsFor(attachment) {
+  if (attachment.resourceType === "video") {
+    const poster = {
+      format: "jpg",
+      transformation: [{ width: 640, crop: "limit", start_offset: 0 }],
+    };
+    return {
+      url: deliveryUrl(attachment, { format: "mp4" }),
+      thumbUrl: deliveryUrl(attachment, poster),
+      posterUrl: deliveryUrl(attachment, poster),
+    };
+  }
+  return {
+    url: deliveryUrl(attachment, {
+      transformation: [
+        { width: 1600, crop: "limit", quality: "auto", fetch_format: "auto" },
+      ],
+    }),
+    thumbUrl: deliveryUrl(attachment, {
+      transformation: [
+        { width: 480, crop: "limit", quality: "auto", fetch_format: "auto" },
+      ],
+    }),
+  };
+}
+
+// Maps message id -> signed delivery URLs (Cloudinary signs them locally).
 export async function signAttachmentUrls(messages) {
   const urls = new Map();
   if (!attachmentsEnabled()) return urls;
-  await Promise.all(
-    messages
-      .filter((message) => message.attachment?.key)
-      .map(async (message) => {
-        urls.set(
-          String(message._id),
-          await getSignedUrl(
-            s3(),
-            new GetObjectCommand({
-              Bucket: bucket(),
-              Key: message.attachment.key,
-            }),
-            { expiresIn: VIEW_URL_TTL_SECONDS },
-          ),
-        );
-      }),
-  );
+  for (const message of messages) {
+    if (message.attachment?.publicId) {
+      urls.set(String(message._id), urlsFor(message.attachment));
+    }
+  }
   return urls;
 }

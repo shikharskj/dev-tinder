@@ -22,7 +22,7 @@ const messageSchema = new mongoose.Schema(
     text: {
       type: String,
       required() {
-        return !this.attachment?.key;
+        return !this.attachment?.publicId;
       },
       default: "",
       trim: true,
@@ -31,9 +31,14 @@ const messageSchema = new mongoose.Schema(
     attachment: {
       type: new mongoose.Schema(
         {
-          key: { type: String, required: true },
+          publicId: { type: String, required: true },
+          resourceType: { type: String, enum: ["image", "video"], required: true },
+          format: { type: String, required: true },
           contentType: { type: String, required: true },
           size: { type: Number, required: true },
+          width: Number,
+          height: Number,
+          duration: Number,
         },
         { _id: false },
       ),

@@ -3,7 +3,8 @@ import Message from "../models/message.js";
 import User from "../models/user.js";
 import { effectiveUsagePlan } from "./subscription.js";
 import {
-  attachmentKeyBelongsTo,
+  deleteMedia,
+  publicIdBelongsTo,
   signAttachmentUrls,
   verifyAttachment,
 } from "./attachments.js";
@@ -55,12 +56,16 @@ export function publicMessage(
     text: deleted ? "" : message.text,
     createdAt: message.createdAt,
     ...(deleted ? { deleted: true } : {}),
-    ...(!deleted && message.attachment?.key && attachmentUrls?.has(String(message._id))
+    ...(!deleted && message.attachment?.publicId && attachmentUrls?.has(String(message._id))
       ? {
           attachment: {
-            url: attachmentUrls.get(String(message._id)),
+            kind: message.attachment.resourceType,
+            ...attachmentUrls.get(String(message._id)),
             contentType: message.attachment.contentType,
             size: message.attachment.size,
+            width: message.attachment.width,
+            height: message.attachment.height,
+            duration: message.attachment.duration,
           },
         }
       : {}),
@@ -83,7 +88,9 @@ export function publicMessage(
                   ? ""
                   : replied.text
                     ? replied.text.slice(0, REPLY_PREVIEW_LENGTH)
-                    : "📷 Photo",
+                    : replied.attachment?.resourceType === "video"
+                      ? "🎥 Video"
+                      : "📷 Photo",
               }
             : { _id: message.replyTo, unavailable: true },
         }
@@ -158,7 +165,7 @@ async function requireOpenChat(conversation, userId) {
 
 export async function sendChatMessage(io, conversation, senderId, payload) {
   const hasAttachment =
-    payload?.attachmentKey !== undefined && payload?.attachmentKey !== null;
+    payload?.attachmentPublicId !== undefined && payload?.attachmentPublicId !== null;
   const text = typeof payload?.text === "string" ? payload.text.trim() : "";
 
   if (
@@ -176,13 +183,13 @@ export async function sendChatMessage(io, conversation, senderId, payload) {
 
   let attachment = null;
   if (hasAttachment) {
-    if (!attachmentKeyBelongsTo(payload.attachmentKey, String(conversation._id))) {
-      throw badRequest("Invalid image attachment.");
+    if (!publicIdBelongsTo(payload.attachmentPublicId, String(conversation._id))) {
+      throw badRequest("Invalid attachment.");
     }
-    attachment = {
-      key: payload.attachmentKey,
-      ...(await verifyAttachment(payload.attachmentKey)),
-    };
+    attachment = await verifyAttachment(
+      payload.attachmentPublicId,
+      payload.attachmentKind,
+    );
   }
 
   let replyTo = null;
@@ -272,9 +279,13 @@ export async function deleteChatMessage(
     message.deletedForEveryoneAt = new Date();
     await Message.updateOne(
       { _id: message._id },
-      { $set: { deletedForEveryoneAt: message.deletedForEveryoneAt, reactions: [] } },
+      {
+        $set: { deletedForEveryoneAt: message.deletedForEveryoneAt, reactions: [] },
+        $unset: { attachment: 1 },
+      },
     );
     message.reactions = [];
+    await deleteMedia(message.attachment);
     await Conversation.updateOne(
       {
         _id: conversation._id,
