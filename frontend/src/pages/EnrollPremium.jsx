@@ -12,8 +12,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api } from "../api.js";
-import { useAuth } from "../auth.js";
+import { api } from "../utils/api.js";
+import { useAuth } from "../utils/auth.js";
 import { USAGE_PLANS } from "../constants";
 
 let razorpayCheckoutPromise;
@@ -282,9 +282,17 @@ export default function EnrollPremium() {
           )}
           <span>
             {currentPlan === "Elite" ? (
-              <>Elite<br />member</>
+              <>
+                Elite
+                <br />
+                member
+              </>
             ) : (
-              <>Clear<br />choices</>
+              <>
+                Clear
+                <br />
+                choices
+              </>
             )}
           </span>
         </div>

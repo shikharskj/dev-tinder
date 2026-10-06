@@ -1,11 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  Archive,
+  Check,
+  ChevronDown,
+  MoreVertical,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import {
   GENDER_OPTIONS,
   activeFacetCount,
   isSkillSelected,
   toggleSkill,
-} from "../peopleFilters";
+} from "../utils/peopleFilters";
 
 function useDebouncedValue(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -187,10 +195,14 @@ export default function PeopleToolbar({
   onClear,
   resultSummary,
   searchLabel,
+  archivedCount = 0,
+  showArchived = false,
+  onToggleArchived,
 }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const sortLabelId = useId();
   const panelRef = useRef(null);
-  const toggleRef = useRef(null);
   const panelId = useId();
   const titleId = useId();
   const skillsLabelId = useId();
@@ -201,6 +213,33 @@ export default function PeopleToolbar({
   const showClear = Boolean(
     query.trim() || skills.length || location || gender,
   );
+
+  const sortChanged = sort !== sortOptions[0]?.value;
+  const menuActive = facetCount > 0 || sortChanged || showArchived;
+  const sortLabel = sortOptions.find((option) => option.value === sort)?.label;
+
+  function closeMenu() {
+    if (menuRef.current) menuRef.current.open = false;
+  }
+
+  useEffect(() => {
+    function closeOnOutside(event) {
+      const menu = menuRef.current;
+      if (menu?.open && !menu.contains(event.target)) menu.open = false;
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape" && menuRef.current?.open) {
+        menuRef.current.open = false;
+        menuRef.current.querySelector("summary")?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 640px)");
@@ -214,7 +253,7 @@ export default function PeopleToolbar({
   useEffect(() => {
     if (!open) return undefined;
 
-    const restoreTarget = toggleRef.current;
+    const restoreTarget = menuRef.current?.querySelector("summary");
     panelRef.current?.focus();
 
     function onKeyDown(event) {
@@ -235,10 +274,7 @@ export default function PeopleToolbar({
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const active = document.activeElement;
-      if (
-        event.shiftKey &&
-        (active === first || active === panelRef.current)
-      ) {
+      if (event.shiftKey && (active === first || active === panelRef.current)) {
         event.preventDefault();
         last.focus();
       } else if (
@@ -330,13 +366,18 @@ export default function PeopleToolbar({
   return (
     <div className="people-toolbar">
       <div className="people-toolbar__bar">
+        <div className="people-toolbar__row">
         <label className="input input-bordered people-toolbar__search min-h-11 w-full">
-          <Search size={18} className="text-base-content/50" aria-hidden="true" />
+          <Search
+            size={18}
+            className="text-base-content/50"
+            aria-hidden="true"
+          />
           <input
             type="search"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search name, location, skills, bio"
+            placeholder={searchLabel}
             aria-label={searchLabel}
           />
           {query && (
@@ -351,22 +392,101 @@ export default function PeopleToolbar({
           )}
         </label>
 
-        <div className="people-toolbar__mobile-controls">
-          <button
-            ref={toggleRef}
-            type="button"
-            className={`btn min-h-11 ${facetCount ? "btn-primary" : "btn-outline"}`}
-            aria-expanded={open}
-            aria-controls={panelId}
-            onClick={() => setOpen((current) => !current)}
+        <details
+          ref={menuRef}
+          className="dropdown dropdown-end people-toolbar__menu"
+        >
+          <summary
+            className="btn btn-ghost btn-square min-h-11 min-w-11"
+            aria-label={
+              menuActive ? "Filters and sort, active" : "Filters and sort"
+            }
           >
-            <SlidersHorizontal size={18} aria-hidden="true" />
-            {facetCount ? `Filters · ${facetCount}` : "Filters"}
-          </button>
-          <SortSelect value={sort} options={sortOptions} onChange={onSortChange} />
-        </div>
+            <MoreVertical size={20} aria-hidden="true" />
+            {menuActive && <span className="people-toolbar__dot" />}
+          </summary>
+          <div className="dropdown-content z-40 w-60 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+            <ul className="menu w-full p-0">
+              <li>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => {
+                    closeMenu();
+                    setOpen(true);
+                  }}
+                >
+                  <SlidersHorizontal size={16} aria-hidden="true" />
+                  Filters
+                  {facetCount > 0 && (
+                    <span className="badge badge-primary badge-sm ml-auto">
+                      {facetCount}
+                    </span>
+                  )}
+                </button>
+              </li>
+              {onToggleArchived && (archivedCount > 0 || showArchived) && (
+                <li>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showArchived}
+                    onClick={() => {
+                      onToggleArchived();
+                      closeMenu();
+                    }}
+                  >
+                    <Archive size={16} aria-hidden="true" />
+                    Show archived
+                    <span className="badge badge-sm ml-auto">
+                      {showArchived ? "On" : archivedCount}
+                    </span>
+                  </button>
+                </li>
+              )}
+            </ul>
+            <p className="people-toolbar__menu-title" id={sortLabelId}>
+              Sort by
+            </p>
+            <ul className="menu w-full p-0" role="radiogroup" aria-labelledby={sortLabelId}>
+              {sortOptions.map((option) => (
+                <li key={option.value}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={sort === option.value}
+                    onClick={() => {
+                      onSortChange(option.value);
+                      closeMenu();
+                    }}
+                  >
+                    <span className="people-toolbar__check">
+                      {sort === option.value && (
+                        <Check size={16} aria-hidden="true" />
+                      )}
+                    </span>
+                    {option.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
+      </div>
 
         <div className="people-toolbar__desktop-filters">
+          {onToggleArchived && (archivedCount > 0 || showArchived) && (
+            <button
+              type="button"
+              className="btn btn-ghost min-h-11"
+              aria-pressed={showArchived}
+              onClick={onToggleArchived}
+            >
+              <Archive size={16} aria-hidden="true" />
+              {showArchived ? "Hide archived" : `Archived (${archivedCount})`}
+            </button>
+          )}
           <SkillDropdown
             options={skillOptions}
             selected={skills}
@@ -378,7 +498,11 @@ export default function PeopleToolbar({
             onChange={onLocationChange}
           />
           <GenderSelect value={gender} onChange={onGenderChange} />
-          <SortSelect value={sort} options={sortOptions} onChange={onSortChange} />
+          <SortSelect
+            value={sort}
+            options={sortOptions}
+            onChange={onSortChange}
+          />
         </div>
       </div>
 
@@ -408,6 +532,10 @@ export default function PeopleToolbar({
             Clear filters
           </button>
         </div>
+      )}
+
+      {sortChanged && sortLabel && (
+        <p className="people-toolbar__sorted">Sorted by {sortLabel}</p>
       )}
 
       {resultSummary && (

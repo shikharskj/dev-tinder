@@ -7,9 +7,10 @@ import Profile from "./pages/Profile";
 import Feed from "./pages/Feed";
 import Requests from "./pages/Requests";
 import Connections from "./pages/Connections";
+import ChatRoom from "./pages/ChatRoom";
 import NotFound from "./pages/NotFound";
-import { GuestOnly, RequireAuth } from "./RouteGuards";
-import { AuthProvider } from "./AuthContext";
+import { GuestOnly, RequireAuth } from "./utils/RouteGuards";
+import { AuthProvider } from "./context/AuthContext";
 import EnrollPremium from "./pages/EnrollPremium";
 
 const router = createBrowserRouter([
@@ -71,6 +72,14 @@ const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <EnrollPremium />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "chat/:targetUserId",
+        element: (
+          <RequireAuth>
+            <ChatRoom />
           </RequireAuth>
         ),
       },

@@ -1,30 +1,35 @@
 import { useEffect, useState } from "react";
-import { MapPin, RefreshCw, Search, UsersRound } from "lucide-react";
+import { RefreshCw, Search, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
-import PeopleToolbar, { SkillFilterButtons } from "../components/PeopleToolbar";
-import { usePeopleFilters } from "../peopleFilters";
+import { api } from "../utils/api";
+import { useAuth } from "../utils/auth";
+import ConnectionRow from "../components/ConnectionRow";
+import PeopleToolbar from "../components/PeopleToolbar";
+import { usePeopleFilters } from "../utils/peopleFilters";
+import { createSocketConnection } from "../utils/socketClient";
 
 function connectionPerson(item) {
   return item.user;
 }
 
 function connectionDate(item) {
-  return item.connectedAt;
+  return item.chat?.lastMessage?.createdAt || item.connectedAt;
 }
 
 const SORT_OPTIONS = [
-  { value: "recent", label: "Most recent" },
+  { value: "recent", label: "Latest activity" },
   { value: "oldest", label: "Oldest" },
   { value: "name", label: "Name" },
 ];
 
 export default function Connections() {
+  const { user: currentUser } = useAuth();
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [failedPhotos, setFailedPhotos] = useState(() => new Set());
+  const [showArchived, setShowArchived] = useState(false);
   const filters = usePeopleFilters(
     connections,
     connectionPerson,
@@ -54,6 +59,33 @@ export default function Connections() {
     };
   }, [reloadKey]);
 
+  useEffect(() => {
+    const socket = createSocketConnection();
+    const refreshConnections = () => setReloadKey((current) => current + 1);
+    const updatePresence = ({
+      userId,
+      online,
+      lastActiveAt,
+      hidden = false,
+    } = {}) => {
+      setConnections((current) =>
+        current.map((connection) =>
+          String(connection.user?._id) === String(userId)
+            ? {
+                ...connection,
+                presence: { online, lastActiveAt, hidden },
+              }
+            : connection,
+        ),
+      );
+    };
+    socket.on("chat:inbox-updated", refreshConnections);
+    socket.on("presence:update", updatePresence);
+    socket.on("chat:blocked", refreshConnections);
+    socket.on("chat:unblocked", refreshConnections);
+    return () => socket.disconnect();
+  }, []);
+
   function retry() {
     setError("");
     setLoading(true);
@@ -64,18 +96,37 @@ export default function Connections() {
     setFailedPhotos((current) => new Set(current).add(userId));
   }
 
-  function formatConnectedDate(value) {
-    if (!value || Number.isNaN(new Date(value).getTime())) return null;
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(value));
+  async function updateChat(connection, updates) {
+    const conversationId = connection.chat?.conversationId;
+    if (!conversationId) return;
+    const previous = connection.chat;
+    const apply = (chat) =>
+      setConnections((current) =>
+        current.map((item) =>
+          item.requestId === connection.requestId ? { ...item, chat } : item,
+        ),
+      );
+    apply({ ...previous, ...updates });
+    try {
+      await api.patch(
+        `/chat/conversations/${conversationId}/settings`,
+        updates,
+      );
+    } catch (requestError) {
+      apply(previous);
+      setError(requestError.message);
+    }
   }
 
   const resultSummary = filters.hasFilters
     ? `Showing ${filters.visibleItems.length} of ${filters.totalCount}`
     : "";
+  const archivedCount = connections.filter(
+    (connection) => connection.chat?.archived,
+  ).length;
+  const visibleConnections = filters.visibleItems.filter(
+    (connection) => Boolean(connection.chat?.archived) === showArchived,
+  );
 
   return (
     <section className="page-content" aria-labelledby="connections-title">
@@ -147,82 +198,60 @@ export default function Connections() {
             onClear={filters.clearFilters}
             resultSummary={resultSummary}
             searchLabel="Search connections"
+            archivedCount={archivedCount}
+            showArchived={showArchived}
+            onToggleArchived={() => setShowArchived((current) => !current)}
           />
 
-          {filters.visibleItems.length === 0 ? (
+          {visibleConnections.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state__icon">
                 <Search size={23} aria-hidden="true" />
               </div>
-              <h2>No connections match those filters.</h2>
-              <p>Try a different name, location, or skill.</p>
+              <h2>
+                {showArchived
+                  ? "No archived chats."
+                  : "No connections match those filters."}
+              </h2>
+              <p>
+                {showArchived
+                  ? "Archived conversations will appear here."
+                  : "Try a different name, location, or skill."}
+              </p>
               <button
                 className="btn btn-ghost mt-2"
                 type="button"
-                onClick={filters.clearFilters}
+                onClick={
+                  showArchived
+                    ? () => setShowArchived(false)
+                    : filters.clearFilters
+                }
               >
-                Clear filters
+                {showArchived ? "Show connections" : "Clear filters"}
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filters.visibleItems.map(({ requestId, connectedAt, user }) => {
-                const initials =
-                  `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase();
-                const connectedDate = formatConnectedDate(connectedAt);
-                const photoFailed = failedPhotos.has(user._id);
-
-                return (
-                  <article className="connection-card" key={requestId}>
-                    <div className="avatar placeholder shrink-0">
-                      <div className="size-14 overflow-hidden rounded-full bg-secondary text-secondary-content">
-                        {user.photoUrl && !photoFailed ? (
-                          <img
-                            src={user.photoUrl}
-                            alt={`${user.firstName} ${user.lastName}`}
-                            loading="lazy"
-                            onError={() => handlePhotoError(user._id)}
-                          />
-                        ) : (
-                          <span aria-hidden="true">{initials || "?"}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="connection-card__body">
-                      <h2 className="truncate text-lg font-bold">
-                        {user.firstName} {user.lastName}
-                      </h2>
-                      <p className="mt-1 flex items-center gap-1 text-sm text-base-content/65">
-                        <MapPin size={14} aria-hidden="true" />
-                        {user.location}
-                        {user.age ? ` · ${user.age}` : ""}
-                      </p>
-                      {user.bio && (
-                        <p className="connection-card__bio">{user.bio}</p>
-                      )}
-                      <SkillFilterButtons
-                        skills={user.skills}
-                        selectedSkills={filters.skills}
-                        onToggle={filters.toggleSelectedSkill}
-                      />
-                      {!!user.interests?.length && (
-                        <p className="connection-card__interests">
-                          Interests: {user.interests.slice(0, 3).join(" · ")}
-                        </p>
-                      )}
-                      {connectedDate && (
-                        <time
-                          className="connection-card__date"
-                          dateTime={connectedAt}
-                        >
-                          Connected {connectedDate}
-                        </time>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <ul className="chat-list">
+              {visibleConnections.map((connection) => (
+                <ConnectionRow
+                  key={connection.requestId}
+                  connection={connection}
+                  currentUserId={currentUser?._id}
+                  photoFailed={failedPhotos.has(connection.user._id)}
+                  onPhotoError={handlePhotoError}
+                  onToggleMute={() =>
+                    void updateChat(connection, {
+                      muted: !connection.chat?.muted,
+                    })
+                  }
+                  onToggleArchive={() =>
+                    void updateChat(connection, {
+                      archived: !connection.chat?.archived,
+                    })
+                  }
+                />
+              ))}
+            </ul>
           )}
         </>
       )}

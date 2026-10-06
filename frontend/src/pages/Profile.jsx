@@ -9,10 +9,10 @@ import {
   UserRound,
 } from "lucide-react";
 import { useBlocker, useBeforeUnload } from "react-router-dom";
-import { api } from "../api";
-import { useAuth } from "../auth";
+import { api } from "../utils/api";
+import { useAuth } from "../utils/auth";
 import TagInput from "../components/TagInput";
-import { getProfileCompletion } from "../profileCompletion";
+import { getProfileCompletion } from "../utils/profileCompletion";
 
 function formFromUser(user) {
   return {
@@ -163,7 +163,15 @@ const Profile = () => {
           ) : (
             <Pencil size={17} aria-hidden="true" />
           )}
-          <span>{editing ? "Preview" : "Edit profile"}</span>
+          <span>
+            {editing ? (
+              "Preview"
+            ) : (
+              <>
+                Edit<span className="hidden sm:inline"> profile</span>
+              </>
+            )}
+          </span>
         </button>
       </div>
 
@@ -178,7 +186,10 @@ const Profile = () => {
         </div>
       )}
 
-      <section className="profile-completion" aria-labelledby="profile-completion-title">
+      <section
+        className="profile-completion"
+        aria-labelledby="profile-completion-title"
+      >
         <div className="profile-completion__summary">
           <div>
             <p className="eyebrow">Profile strength</p>
@@ -189,7 +200,8 @@ const Profile = () => {
             </h2>
           </div>
           <span>
-            {profileCompletion.completedCount}/{profileCompletion.totalCount} details
+            {profileCompletion.completedCount}/{profileCompletion.totalCount}{" "}
+            details
           </span>
         </div>
         <progress

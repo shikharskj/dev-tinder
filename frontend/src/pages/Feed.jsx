@@ -3,20 +3,21 @@ import {
   BadgeCheck,
   Check,
   Heart,
+  Infinity as InfinityIcon,
   MapPin,
   RotateCw,
   Sparkles,
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
-import { useAuth } from "../auth";
+import { api } from "../utils/api";
+import { useAuth } from "../utils/auth";
 import {
   getCommonGround,
   getProfileCompletion,
   hasMemberAddedPhoto,
   hasMemberWrittenBio,
-} from "../profileCompletion";
+} from "../utils/profileCompletion";
 
 const PAGE_SIZE = 10;
 const SWIPE_THRESHOLD = 96;
@@ -28,6 +29,7 @@ const PROMOTION_DURATION = 240;
 
 const Feed = () => {
   const { user } = useAuth();
+  const quotaMenuRef = useRef(null);
   const [people, setPeople] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,17 +43,33 @@ const Feed = () => {
   const [promoting, setPromoting] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [requestQuota, setRequestQuota] = useState(null);
-  const [expandedProfileId, setExpandedProfileId] = useState(null);
   const onboardingKey = user?._id
     ? `devtinder:onboarding-dismissed:${user._id}`
     : null;
   const [onboardingDismissed, setOnboardingDismissed] = useState(
-    () => onboardingKey && window.localStorage.getItem(onboardingKey) === "true",
+    () =>
+      onboardingKey && window.localStorage.getItem(onboardingKey) === "true",
   );
   const seenIds = useRef(new Set());
   const gesture = useRef(null);
   const exitTimer = useRef(null);
   const promotionTimer = useRef(null);
+
+  useEffect(() => {
+    function closeQuotaMenu(event) {
+      const menu = quotaMenuRef.current;
+      if (!menu?.open) return;
+      if (event.type === "keydown" && event.key !== "Escape") return;
+      if (event.type === "pointerdown" && menu.contains(event.target)) return;
+      menu.open = false;
+    }
+    document.addEventListener("pointerdown", closeQuotaMenu);
+    document.addEventListener("keydown", closeQuotaMenu);
+    return () => {
+      document.removeEventListener("pointerdown", closeQuotaMenu);
+      document.removeEventListener("keydown", closeQuotaMenu);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -125,7 +143,9 @@ const Feed = () => {
     if (!activePerson || busy) return;
     if (status === "interested" && requestLimitReached) {
       setOffsetX(0);
-      setError("You’ve reached today’s 20 request limit. Upgrade to Elite for unlimited requests.");
+      setError(
+        "You’ve reached today’s 20 request limit. Upgrade to Elite for unlimited requests.",
+      );
       return;
     }
 
@@ -279,11 +299,9 @@ const Feed = () => {
 
   const activePerson = people[0];
   const requestLimitReached =
-    requestQuota &&
-    !requestQuota.isElite &&
-    requestQuota.remaining === 0;
-  const showAllProfileTags =
-    String(expandedProfileId) === String(activePerson?._id);
+    requestQuota && !requestQuota.isElite && requestQuota.remaining === 0;
+  const quotaLow =
+    requestQuota && !requestQuota.isElite && requestQuota.remaining <= 5;
   const swipeStrength = Math.min(Math.abs(offsetX) / SWIPE_THRESHOLD, 1);
   const activeDirection =
     pendingDirection || exitDirection || (offsetX >= 0 ? 1 : -1);
@@ -300,16 +318,61 @@ const Feed = () => {
   const sharedTags = getCommonGround(user || {}, activePerson || {});
 
   return (
-    <section className="page-content" aria-labelledby="feed-title">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Your next collaborator</p>
+    <section className="page-content feed-page" aria-labelledby="feed-title">
+      <div className="page-heading feed-heading">
+        <div className="feed-heading__title">
+          <p className="eyebrow feed-heading__eyebrow">
+            Your next collaborator
+          </p>
           <h1 id="feed-title">Discover</h1>
-          <p>
-            Find someone whose curiosity matches yours. You’ll connect when
-            they accept your request.
+          <p className="feed-heading__lead">
+            Find someone whose curiosity matches yours. You’ll connect when they
+            accept your request.
           </p>
         </div>
+        {requestQuota && (
+          <details
+            ref={quotaMenuRef}
+            className="dropdown dropdown-end feed-quota-pill"
+          >
+            <summary
+              className={`feed-quota-pill__button${requestLimitReached ? " is-limit" : quotaLow ? " is-low" : ""}`}
+              aria-label={
+                requestQuota.isElite
+                  ? "Elite plan, unlimited requests"
+                  : `${requestQuota.used} of ${requestQuota.limit} requests used today`
+              }
+            >
+              {requestQuota.isElite ? (
+                <>
+                  <InfinityIcon size={15} aria-hidden="true" />
+                  Elite
+                </>
+              ) : (
+                <>
+                  {requestQuota.used}/{requestQuota.limit}
+                  <span> today</span>
+                </>
+              )}
+            </summary>
+            <div className="dropdown-content feed-quota-pill__popover">
+              {requestQuota.isElite ? (
+                <p>Your Elite plan: unlimited outgoing connection requests.</p>
+              ) : (
+                <>
+                  <p>
+                    Basic plan · <strong>{requestQuota.used}</strong> of{" "}
+                    {requestQuota.limit} requests used today.
+                  </p>
+                  <small>Resets at midnight UTC</small>
+                  {(quotaLow || requestLimitReached) && (
+                    <Link to="/enroll-premium">Get unlimited with Elite</Link>
+                  )}
+                </>
+              )}
+            </div>
+          </details>
+        )}
         <button
           className="btn btn-ghost btn-square"
           type="button"
@@ -323,7 +386,10 @@ const Feed = () => {
       </div>
 
       {!onboardingDismissed && (
-        <aside className="onboarding-card" aria-labelledby="onboarding-title">
+        <aside
+          className="onboarding-card feed-onboarding"
+          aria-labelledby="onboarding-title"
+        >
           <div className="onboarding-card__copy">
             <p className="eyebrow">A quick start</p>
             <h2 id="onboarding-title">Make your next connection count</h2>
@@ -370,7 +436,7 @@ const Feed = () => {
       )}
 
       {requestQuota && (
-        <div className="daily-request-quota" role="status">
+        <div className="daily-request-quota feed-quota-banner" role="status">
           {requestQuota.isElite ? (
             <>
               <BadgeCheck size={17} aria-hidden="true" />
@@ -408,16 +474,51 @@ const Feed = () => {
           </div>
         </div>
       ) : !activePerson ? (
-        <div className="empty-state">
+        <aside
+          className="empty-state empty-state--notice"
+          role="status"
+          aria-labelledby="feed-empty-title"
+        >
           <div className="empty-state__icon">
             <Heart size={24} aria-hidden="true" />
           </div>
-          <h2>You’re all caught up.</h2>
-          <p>Check back soon for more developers to meet.</p>
-        </div>
+          {requestLimitReached ? (
+            <>
+              <h2 id="feed-empty-title">
+                You’ve used all 20 connection requests for today.
+              </h2>
+              <p>
+                Your Basic plan allowance resets at midnight UTC. Upgrade to
+                Elite for unlimited connection requests.
+              </p>
+              <Link className="btn btn-primary" to="/enroll-premium">
+                Explore Elite
+              </Link>
+              <p className="empty-state__reset">Resets at midnight UTC</p>
+            </>
+          ) : (
+            <>
+              <h2 id="feed-empty-title">You’re all caught up.</h2>
+              <p>Check back soon for more developers to meet.</p>
+              <button
+                className="btn btn-primary min-h-11 gap-2"
+                type="button"
+                onClick={refreshFeed}
+                disabled={busy}
+              >
+                <RotateCw size={17} aria-hidden="true" />
+                Refresh
+              </button>
+              <div className="empty-state__links">
+                <Link to="/requests">Check requests</Link>
+                <Link to="/profile">Improve your profile</Link>
+              </div>
+            </>
+          )}
+        </aside>
       ) : (
         <>
-          <div className="swipe-progress" aria-live="polite">
+          <div className="swipe-progress" aria-hidden="true">
             <span>
               {people.length} {people.length === 1 ? "profile" : "profiles"} in
               this batch
@@ -473,11 +574,7 @@ const Feed = () => {
               </span>
               <figure className="candidate-photo">
                 {hasMemberAddedPhoto(activePerson) ? (
-                  <img
-                    src={activePerson.photoUrl}
-                    alt=""
-                    draggable="false"
-                  />
+                  <img src={activePerson.photoUrl} alt="" draggable="false" />
                 ) : (
                   <div
                     className="candidate-photo__placeholder"
@@ -535,7 +632,9 @@ const Feed = () => {
                     <p className="candidate-profile-detail__label">
                       About · self-written
                     </p>
-                    <p className="text-sm leading-relaxed">{activePerson.bio}</p>
+                    <p className="text-sm leading-relaxed">
+                      {activePerson.bio}
+                    </p>
                   </div>
                 )}
                 {!!activePerson.skills?.length && (
@@ -544,13 +643,11 @@ const Feed = () => {
                       Skills listed
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {activePerson.skills
-                        .slice(0, showAllProfileTags ? undefined : 3)
-                        .map((skill) => (
-                          <span className="badge badge-outline" key={skill}>
-                            {skill}
-                          </span>
-                        ))}
+                      {activePerson.skills.map((skill) => (
+                        <span className="badge badge-outline" key={skill}>
+                          {skill}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -560,9 +657,7 @@ const Feed = () => {
                       Interests listed
                     </p>
                     <p className="text-xs text-base-content/65">
-                      {activePerson.interests
-                        .slice(0, showAllProfileTags ? undefined : 3)
-                        .join(" · ")}
+                      {activePerson.interests.join(" · ")}
                     </p>
                   </div>
                 )}
@@ -574,34 +669,6 @@ const Feed = () => {
                       This developer is still building their profile.
                     </p>
                   )}
-                {(activePerson.skills?.length > 3 ||
-                  activePerson.interests?.length > 3) && (
-                  <button
-                    className="candidate-card__more"
-                    type="button"
-                    aria-expanded={showAllProfileTags}
-                    onClick={() =>
-                      setExpandedProfileId((current) =>
-                        String(current) === String(activePerson._id)
-                          ? null
-                          : activePerson._id,
-                      )
-                    }
-                  >
-                    {showAllProfileTags
-                      ? "Show fewer details"
-                      : `Show ${
-                          Math.max(
-                            0,
-                            (activePerson.skills?.length || 0) - 3,
-                          ) +
-                          Math.max(
-                            0,
-                            (activePerson.interests?.length || 0) - 3,
-                          )
-                        } more`}
-                  </button>
-                )}
               </div>
               <div className="swipe-actions" aria-label="Profile actions">
                 <div className="swipe-action-group">

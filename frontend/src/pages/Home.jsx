@@ -1,6 +1,6 @@
 import { ArrowRight, Code2, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth";
+import { useAuth } from "../utils/auth";
 
 const Home = () => {
   const { user } = useAuth();

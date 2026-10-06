@@ -5,8 +5,18 @@ import { DIGITS_ONLY_PATTERN, UPDATE_FIELDS } from "../../constants.js";
 import { sendError, sendSuccess } from "../utils/response.js";
 import ConnectionRequest from "../models/connectionRequest.js";
 import mongoose from "mongoose";
+import { subDays } from "date-fns";
+import Conversation, {
+  getConversationPairKey,
+} from "../models/conversation.js";
+import ChatBlock from "../models/chatBlock.js";
+import { getUnreadCounts } from "../utils/chat.js";
+import ChatPreference from "../models/chatPreference.js";
+import ChatPresence from "../models/chatPresence.js";
+import { activeChatSockets } from "../utils/chatSocketState.js";
 
 const userRouter = express.Router();
+const BASIC_CHAT_HISTORY_DAYS = 7;
 
 // Get incoming connection requests that are awaiting review.
 userRouter.get("/user/requests", authenticateUser, async (req, res) => {
@@ -93,6 +103,94 @@ userRouter.get("/user/connections", authenticateUser, async (req, res) => {
         requestId: request._id,
         connectedAt: request.updatedAt,
         user: otherUser,
+        pairKey: otherUser
+          ? getConversationPairKey(loggedInUserId, otherUser._id)
+          : null,
+      };
+    });
+
+    const pairKeys = connections.map(({ pairKey }) => pairKey).filter(Boolean);
+
+    const conversations = await Conversation.find({
+      pairKey: { $in: pairKeys },
+    });
+
+    const conversationsByPair = new Map(
+      conversations.map((conversation) => [conversation.pairKey, conversation]),
+    );
+
+    const [unreadCounts, blocks] = await Promise.all([
+      getUnreadCounts(
+        conversations,
+        loggedInUserId,
+        req.user.usagePlan === "Elite"
+          ? null
+          : subDays(new Date(), BASIC_CHAT_HISTORY_DAYS),
+      ),
+      ChatBlock.find({ pairKey: { $in: pairKeys } }).select(
+        "pairKey blockerId blockedId",
+      ),
+    ]);
+    const blockedPairs = new Map(blocks.map((block) => [block.pairKey, block]));
+    const peerIds = connections
+      .map(({ user }) => user?._id)
+      .filter(Boolean);
+    const [preferences, presences] = await Promise.all([
+      ChatPreference.find({ userId: { $in: peerIds } }).lean(),
+      ChatPresence.find({ userId: { $in: peerIds } })
+        .select("userId lastActiveAt")
+        .lean(),
+    ]);
+    const preferencesByUser = new Map(
+      preferences.map((preference) => [String(preference.userId), preference]),
+    );
+    const presenceByUser = new Map(
+      presences.map((presence) => [String(presence.userId), presence]),
+    );
+
+    const results = connections.map(({ pairKey, ...connection }) => {
+      const conversation = conversationsByPair.get(pairKey);
+
+      const state = conversation?.participantStates.find(
+        (participantState) =>
+          String(participantState.userId) === String(loggedInUserId),
+      );
+
+      const block = blockedPairs.get(pairKey);
+      const peerId = String(connection.user?._id || "");
+      const activityShared =
+        !block &&
+        preferencesByUser.get(peerId)?.activitySharingEnabled !== false;
+      const online =
+        activityShared && Boolean(activeChatSockets.get(peerId)?.size);
+      return {
+        ...connection,
+        presence: {
+          online,
+          lastActiveAt:
+            activityShared && !online
+              ? presenceByUser.get(peerId)?.lastActiveAt || null
+              : null,
+          hidden: !activityShared,
+        },
+        chat: conversation
+          ? {
+              conversationId: conversation._id,
+              lastMessage:
+                req.user.usagePlan === "Elite" ||
+                !conversation.lastMessage?.createdAt ||
+                conversation.lastMessage.createdAt >=
+                  subDays(new Date(), BASIC_CHAT_HISTORY_DAYS)
+                  ? conversation.lastMessage
+                  : null,
+              unreadCount: unreadCounts.get(String(conversation._id)) || 0,
+              archived: state?.archived || false,
+              muted: state?.muted || false,
+              blocked: Boolean(block),
+              blockedByMe:
+                String(block?.blockerId || "") === String(loggedInUserId),
+            }
+          : null,
       };
     });
 
@@ -100,7 +198,7 @@ userRouter.get("/user/connections", authenticateUser, async (req, res) => {
       res,
       200,
       "All connections fetched successfully.",
-      connections,
+      results,
     );
   } catch (error) {
     console.error("Error fetching user connections:", error);

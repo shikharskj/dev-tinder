@@ -12,9 +12,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api } from "../utils/api";
 import PeopleToolbar, { SkillFilterButtons } from "../components/PeopleToolbar";
-import { usePeopleFilters } from "../peopleFilters";
+import { usePeopleFilters } from "../utils/peopleFilters";
 
 function requestPerson(item) {
   return item.fromUserId;
@@ -167,7 +167,11 @@ export default function Requests() {
         )}
       </div>
 
-      <div className="request-tabs" role="group" aria-label="Connection requests">
+      <div
+        className="request-tabs"
+        role="group"
+        aria-label="Connection requests"
+      >
         <button
           className={`request-tabs__tab${activeTab === "incoming" ? " is-active" : ""}`}
           type="button"
@@ -176,7 +180,9 @@ export default function Requests() {
         >
           <Inbox size={16} aria-hidden="true" />
           Received
-          {!loading && <span className="badge badge-sm">{requests.length}</span>}
+          {!loading && (
+            <span className="badge badge-sm">{requests.length}</span>
+          )}
         </button>
         <button
           className={`request-tabs__tab${activeTab === "sent" ? " is-active" : ""}`}
@@ -225,184 +231,190 @@ export default function Requests() {
           id="incoming-requests-panel"
           aria-label="Received connection requests"
         >
-      {loading ? (
-        <div className="grid gap-3" aria-label="Loading requests">
-          {[0, 1].map((item) => (
-            <div key={item} className="skeleton h-36 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : filters.totalCount === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state__icon">
-            <Inbox size={24} aria-hidden="true" />
-          </div>
-          <h2>No new requests yet.</h2>
-          <p>
-            When someone is interested in connecting, you’ll find them here.
-          </p>
-        </div>
-      ) : (
-        <>
-          <PeopleToolbar
-            query={filters.query}
-            onQueryChange={filters.setQuery}
-            skills={filters.skills}
-            onSkillsChange={filters.setSkills}
-            skillOptions={filters.skillOptions}
-            location={filters.location}
-            onLocationChange={filters.setLocation}
-            locationOptions={filters.locationOptions}
-            gender={filters.gender}
-            onGenderChange={filters.setGender}
-            sort={filters.sort}
-            onSortChange={filters.setSort}
-            sortOptions={SORT_OPTIONS}
-            onClear={filters.clearFilters}
-            resultSummary={resultSummary}
-            searchLabel="Search requests"
-          />
-
-          {filters.visibleItems.length === 0 ? (
+          {loading ? (
+            <div className="grid gap-3" aria-label="Loading requests">
+              {[0, 1].map((item) => (
+                <div key={item} className="skeleton h-36 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : filters.totalCount === 0 ? (
             <div className="empty-state">
               <div className="empty-state__icon">
-                <Search size={23} aria-hidden="true" />
+                <Inbox size={24} aria-hidden="true" />
               </div>
-              <h2>No requests match those filters.</h2>
-              <p>Try another name, location, or skill.</p>
-              <button
-                className="btn btn-ghost mt-2"
-                type="button"
-                onClick={filters.clearFilters}
-              >
-                Clear filters
-              </button>
+              <h2>No new requests yet.</h2>
+              <p>
+                When someone is interested in connecting, you’ll find them here.
+              </p>
             </div>
           ) : (
-            <div className="grid gap-3">
-              {filters.visibleItems.map((request) => {
-                const person = request.fromUserId;
-                const pendingStatus = pendingActions[request._id];
-                const reviewError = reviewErrors[request._id];
-                const initials =
-                  `${person.firstName?.[0] || ""}${person.lastName?.[0] || ""}`.toUpperCase();
-                const requestedDate = formatRequestDate(request.createdAt);
+            <>
+              <PeopleToolbar
+                query={filters.query}
+                onQueryChange={filters.setQuery}
+                skills={filters.skills}
+                onSkillsChange={filters.setSkills}
+                skillOptions={filters.skillOptions}
+                location={filters.location}
+                onLocationChange={filters.setLocation}
+                locationOptions={filters.locationOptions}
+                gender={filters.gender}
+                onGenderChange={filters.setGender}
+                sort={filters.sort}
+                onSortChange={filters.setSort}
+                sortOptions={SORT_OPTIONS}
+                onClear={filters.clearFilters}
+                resultSummary={resultSummary}
+                searchLabel="Search requests"
+              />
 
-                return (
-                  <article
-                    className="request-row"
-                    key={request._id}
-                    aria-busy={Boolean(pendingStatus)}
+              {filters.visibleItems.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-state__icon">
+                    <Search size={23} aria-hidden="true" />
+                  </div>
+                  <h2>No requests match those filters.</h2>
+                  <p>Try another name, location, or skill.</p>
+                  <button
+                    className="btn btn-ghost mt-2"
+                    type="button"
+                    onClick={filters.clearFilters}
                   >
-                    <div className="avatar placeholder shrink-0">
-                      <div className="size-14 overflow-hidden rounded-full bg-secondary text-secondary-content sm:size-16">
-                        {person.photoUrl && !failedPhotos.has(person._id) ? (
-                          <img
-                            src={person.photoUrl}
-                            alt={`${person.firstName} ${person.lastName}`}
-                            loading="lazy"
-                            onError={() => handlePhotoError(person._id)}
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {filters.visibleItems.map((request) => {
+                    const person = request.fromUserId;
+                    const pendingStatus = pendingActions[request._id];
+                    const reviewError = reviewErrors[request._id];
+                    const initials =
+                      `${person.firstName?.[0] || ""}${person.lastName?.[0] || ""}`.toUpperCase();
+                    const requestedDate = formatRequestDate(request.createdAt);
+
+                    return (
+                      <article
+                        className="request-row"
+                        key={request._id}
+                        aria-busy={Boolean(pendingStatus)}
+                      >
+                        <div className="avatar placeholder shrink-0">
+                          <div className="size-14 overflow-hidden rounded-full bg-secondary text-secondary-content sm:size-16">
+                            {person.photoUrl &&
+                            !failedPhotos.has(person._id) ? (
+                              <img
+                                src={person.photoUrl}
+                                alt={`${person.firstName} ${person.lastName}`}
+                                loading="lazy"
+                                onError={() => handlePhotoError(person._id)}
+                              />
+                            ) : (
+                              <span aria-hidden="true">{initials || "?"}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="request-row__body">
+                          <h2 className="truncate text-lg font-bold">
+                            {person.firstName} {person.lastName}
+                          </h2>
+                          <p className="mt-1 flex items-center gap-1 text-sm text-base-content/65">
+                            <MapPin size={14} aria-hidden="true" />
+                            {person.location}
+                            {person.age ? ` · ${person.age}` : ""}
+                          </p>
+                          {requestedDate && (
+                            <time
+                              className="request-row__date"
+                              dateTime={request.createdAt}
+                            >
+                              Requested {requestedDate}
+                            </time>
+                          )}
+                          {person.bio && (
+                            <p className="mt-2 line-clamp-2 text-sm leading-relaxed">
+                              {person.bio}
+                            </p>
+                          )}
+                          <SkillFilterButtons
+                            skills={person.skills}
+                            selectedSkills={filters.skills}
+                            onToggle={filters.toggleSelectedSkill}
                           />
-                        ) : (
-                          <span aria-hidden="true">{initials || "?"}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="request-row__body">
-                      <h2 className="truncate text-lg font-bold">
-                        {person.firstName} {person.lastName}
-                      </h2>
-                      <p className="mt-1 flex items-center gap-1 text-sm text-base-content/65">
-                        <MapPin size={14} aria-hidden="true" />
-                        {person.location}
-                        {person.age ? ` · ${person.age}` : ""}
-                      </p>
-                      {requestedDate && (
-                        <time
-                          className="request-row__date"
-                          dateTime={request.createdAt}
-                        >
-                          Requested {requestedDate}
-                        </time>
-                      )}
-                      {person.bio && (
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed">
-                          {person.bio}
-                        </p>
-                      )}
-                      <SkillFilterButtons
-                        skills={person.skills}
-                        selectedSkills={filters.skills}
-                        onToggle={filters.toggleSelectedSkill}
-                      />
-                      {!!person.interests?.length && (
-                        <p className="request-row__interests">
-                          Interests: {person.interests.slice(0, 3).join(" · ")}
-                        </p>
-                      )}
-                      {reviewError && (
-                        <div className="alert alert-error mt-3" role="alert">
-                          <span>{reviewError.message}</span>
+                          {!!person.interests?.length && (
+                            <p className="request-row__interests">
+                              Interests:{" "}
+                              {person.interests.slice(0, 3).join(" · ")}
+                            </p>
+                          )}
+                          {reviewError && (
+                            <div
+                              className="alert alert-error mt-3"
+                              role="alert"
+                            >
+                              <span>{reviewError.message}</span>
+                              <button
+                                className="btn btn-ghost btn-xs ml-auto"
+                                type="button"
+                                onClick={() =>
+                                  reviewRequest(request._id, reviewError.status)
+                                }
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="request-actions">
                           <button
-                            className="btn btn-ghost btn-xs ml-auto"
+                            className="btn btn-ghost btn-square min-h-11"
                             type="button"
                             onClick={() =>
-                              reviewRequest(request._id, reviewError.status)
+                              reviewRequest(request._id, "rejected")
                             }
+                            disabled={Boolean(pendingStatus)}
+                            aria-label={`Decline ${person.firstName}'s request`}
+                            title="Decline"
                           >
-                            Retry
+                            {pendingStatus === "rejected" ? (
+                              <span
+                                className="loading loading-spinner"
+                                aria-label="Declining request"
+                              />
+                            ) : (
+                              <X size={20} aria-hidden="true" />
+                            )}
+                          </button>
+                          <button
+                            className="btn btn-primary btn-square min-h-11"
+                            type="button"
+                            onClick={() =>
+                              reviewRequest(request._id, "accepted")
+                            }
+                            disabled={Boolean(pendingStatus)}
+                            aria-label={`Accept ${person.firstName}'s request`}
+                            title="Accept"
+                          >
+                            {pendingStatus === "accepted" ? (
+                              <span
+                                className="loading loading-spinner"
+                                aria-label="Accepting request"
+                              />
+                            ) : (
+                              <Check size={20} aria-hidden="true" />
+                            )}
                           </button>
                         </div>
-                      )}
-                    </div>
-                    <div className="request-actions">
-                      <button
-                        className="btn btn-ghost btn-square min-h-11"
-                        type="button"
-                        onClick={() => reviewRequest(request._id, "rejected")}
-                        disabled={Boolean(pendingStatus)}
-                        aria-label={`Decline ${person.firstName}'s request`}
-                        title="Decline"
-                      >
-                        {pendingStatus === "rejected" ? (
-                          <span
-                            className="loading loading-spinner"
-                            aria-label="Declining request"
-                          />
-                        ) : (
-                          <X size={20} aria-hidden="true" />
-                        )}
-                      </button>
-                      <button
-                        className="btn btn-primary btn-square min-h-11"
-                        type="button"
-                        onClick={() => reviewRequest(request._id, "accepted")}
-                        disabled={Boolean(pendingStatus)}
-                        aria-label={`Accept ${person.firstName}'s request`}
-                        title="Accept"
-                      >
-                        {pendingStatus === "accepted" ? (
-                          <span
-                            className="loading loading-spinner"
-                            aria-label="Accepting request"
-                          />
-                        ) : (
-                          <Check size={20} aria-hidden="true" />
-                        )}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
         </div>
       ) : (
-        <div
-          id="sent-requests-panel"
-          aria-label="Sent connection requests"
-        >
+        <div id="sent-requests-panel" aria-label="Sent connection requests">
           {sentLoading ? (
             <div className="grid gap-3" aria-label="Loading sent requests">
               {[0, 1].map((item) => (
@@ -430,7 +442,9 @@ export default function Requests() {
                 <Send size={23} aria-hidden="true" />
               </div>
               <h2>No sent requests yet.</h2>
-              <p>When you reach out to someone, their response will show here.</p>
+              <p>
+                When you reach out to someone, their response will show here.
+              </p>
               <Link className="btn btn-primary mt-2" to="/feed">
                 Discover developers
               </Link>
@@ -461,7 +475,10 @@ export default function Requests() {
                 const StatusIcon = status.Icon;
 
                 return (
-                  <article className="request-row sent-request-row" key={request._id}>
+                  <article
+                    className="request-row sent-request-row"
+                    key={request._id}
+                  >
                     <div className="avatar placeholder shrink-0">
                       <div className="size-14 overflow-hidden rounded-full bg-secondary text-secondary-content">
                         {person?.photoUrl && !failedPhotos.has(person._id) ? (
@@ -486,7 +503,10 @@ export default function Requests() {
                       </p>
                     </div>
                     {request.status === "accepted" && (
-                      <Link className="btn btn-outline btn-sm" to="/connections">
+                      <Link
+                        className="btn btn-outline btn-sm"
+                        to="/connections"
+                      >
                         View connection
                       </Link>
                     )}

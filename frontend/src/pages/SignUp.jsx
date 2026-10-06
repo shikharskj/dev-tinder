@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, Code2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth";
+import { useAuth } from "../utils/auth";
 
 const initialForm = {
   firstName: "",

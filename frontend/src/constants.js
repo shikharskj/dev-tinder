@@ -1,3 +1,6 @@
+export const API_BASE_URL =
+  location.hostname === "localhost" ? "http://localhost:7777" : "/api";
+
 export const USAGE_PLANS = [
   {
     name: "Basic",
@@ -12,17 +15,17 @@ export const USAGE_PLANS = [
       { label: "Discovery placement", value: "Standard feed ordering" },
       {
         label: "Messaging",
-        value: "In-app messaging is not available yet",
-        included: false,
+        value: "Message people after you become accepted connections",
+        included: true,
       },
       {
         label: "Message history",
-        value: "In-app messaging is not available yet",
-        included: false,
+        value: "Access the most recent 7 days of chat history",
+        included: true,
       },
       {
         label: "Read receipts",
-        value: "In-app messaging is not available yet",
+        value: "Read receipts are an Elite feature",
         included: false,
       },
       {
@@ -49,18 +52,18 @@ export const USAGE_PLANS = [
       },
       {
         label: "Messaging",
-        value: "In-app messaging is not available yet",
-        included: false,
+        value: "Message people after you become accepted connections",
+        included: true,
       },
       {
         label: "Message history",
-        value: "In-app messaging is not available yet",
-        included: false,
+        value: "Unlimited message history",
+        included: true,
       },
       {
         label: "Read receipts",
-        value: "In-app messaging is not available yet",
-        included: false,
+        value: "See when your messages are read when the other member shares receipts",
+        included: true,
       },
       {
         label: "Profile badge",
