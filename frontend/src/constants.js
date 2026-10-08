@@ -62,7 +62,8 @@ export const USAGE_PLANS = [
       },
       {
         label: "Read receipts",
-        value: "See when your messages are read when the other member shares receipts",
+        value:
+          "See when your messages are read when the other member shares receipts",
         included: true,
       },
       {
@@ -71,5 +72,51 @@ export const USAGE_PLANS = [
       },
     ],
     current: false,
+  },
+];
+
+export const PRIVACY_POLICY_SECTIONS = [
+  {
+    title: "Who operates DevTinder",
+    content: "[Add the operator’s name and a working privacy contact email.]",
+  },
+  {
+    title: "Information we collect",
+    content:
+      "[Describe account details, profile information, messages, uploaded media, payment records, and technical data actually collected.]",
+  },
+  {
+    title: "How we use information",
+    content:
+      "[Explain how information supports accounts, matching, chat, subscriptions, notifications, and security.]",
+  },
+  {
+    title: "Information visible to other users",
+    content:
+      "[Explain who can see profiles, messages, online status, and other shared information.]",
+  },
+  {
+    title: "Service providers and sharing",
+    content:
+      "[Describe the hosting, database, payment, email, storage, and analytics providers actually used, and what they receive.]",
+  },
+  {
+    title: "Cookies and browser storage",
+    content:
+      "[Describe authentication cookies and any other cookies or browser storage used.]",
+  },
+  {
+    title: "Retention and deletion",
+    content:
+      "[Explain how long data is retained and how users can request account or data deletion, including any retained records.]",
+  },
+  {
+    title: "Your choices and contacting us",
+    content:
+      "[Explain available privacy settings and how users can request access, corrections, or deletion.]",
+  },
+  {
+    title: "Changes to this policy",
+    content: "[Explain how policy updates will be communicated.]",
   },
 ];

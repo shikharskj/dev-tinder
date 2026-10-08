@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import { GuestOnly, RequireAuth } from "./utils/RouteGuards";
 import { AuthProvider } from "./context/AuthContext";
 import EnrollPremium from "./pages/EnrollPremium";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const router = createBrowserRouter([
   {
@@ -19,6 +20,10 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Home /> },
+      {
+        path: "privacy-policy",
+        element: <PrivacyPolicy />,
+      },
       {
         path: "login",
         element: (

@@ -189,6 +189,18 @@ const SignUp = () => {
               required
             />
           </label>
+          <p className="text-center text-sm text-base-content/70">
+            Learn how we handle your information in our{" "}
+            <Link
+              to="/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link link-primary"
+            >
+              Privacy Policy (opens in a new tab)
+            </Link>
+            .
+          </p>
           <button
             className="btn btn-primary mt-1 min-h-12 w-full"
             type="submit"
