@@ -11,6 +11,6 @@ export const createSocketConnection = () => {
 
   return io(socketOrigin, {
     withCredentials: true,
-    path: "/socket.io",
+    path: "/api/socket.io",
   });
 };
