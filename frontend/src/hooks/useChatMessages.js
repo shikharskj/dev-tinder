@@ -38,12 +38,14 @@ export default function useChatMessages({
         queuedReadConversationsRef.current.add(conversationId);
         return;
       }
+
       pendingReadConversationsRef.current.add(conversationId);
 
       try {
         do {
           queuedReadConversationsRef.current.delete(conversationId);
           const socket = socketRef.current;
+
           if (!socket?.connected || !socketConnectedRef.current) {
             await api.post(`/chat/conversations/${conversationId}/read`, {});
             continue;
@@ -67,10 +69,12 @@ export default function useChatMessages({
                   },
                 );
             });
+
             if (!result?.ok) {
               const error = new Error(
                 result?.message || "Unable to mark messages read.",
               );
+
               error.acknowledged = true;
               throw error;
             }
@@ -81,6 +85,7 @@ export default function useChatMessages({
             ) {
               throw requestError;
             }
+
             await api.post(`/chat/conversations/${conversationId}/read`, {});
           }
         } while (queuedReadConversationsRef.current.has(conversationId));
@@ -104,6 +109,7 @@ export default function useChatMessages({
         setMessages([]);
         // Keep loading until the conversation arrives to avoid an empty-chat flash.
         if (hasChat) setLoadingHistory(false);
+
         return;
       }
 
@@ -208,12 +214,15 @@ export default function useChatMessages({
       ) {
         return;
       }
+
       socketActionsRef.current.stopTyping?.();
 
       const clientMessageId =
         messageToRetry?.clientMessageId || createClientMessageId();
+
       const replyTarget = messageToRetry ? messageToRetry.replyTo : replyTo;
       const replyToId = replyTarget?._id || undefined;
+
       const outgoing = {
         conversationId: chat.conversationId,
         clientMessageId,
@@ -224,6 +233,7 @@ export default function useChatMessages({
       if (!messageToRetry) {
         setDraft("");
         setReplyTo(null);
+        
         setMessages((current) =>
           mergeMessage(current, {
             _id: clientMessageId,
@@ -288,8 +298,10 @@ export default function useChatMessages({
         setMessages((current) =>
           mergeMessage(current, { ...savedMessage, pending: false }),
         );
+
         shouldScrollToBottomRef.current = true;
         setError("");
+        
         void markRead(chat.conversationId);
       } catch (requestError) {
         setMessages((current) =>

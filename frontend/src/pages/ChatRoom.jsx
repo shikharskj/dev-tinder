@@ -71,6 +71,7 @@ export default function ChatRoom() {
   const [reportReason, setReportReason] = useState("other");
   const [reportDetails, setReportDetails] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
+
   const {
     savingSettings,
     updateConversationSettings,
@@ -84,6 +85,7 @@ export default function ChatRoom() {
     setPresence: conversation.setPresence,
     setError: conversation.setError,
   });
+
   const { socketConnected, typing, handleDraftChange } = useChatSocket({
     chat: conversation.chat,
     targetUserId,
@@ -143,12 +145,15 @@ export default function ChatRoom() {
 
   function jumpToMessage(messageId) {
     const element = document.getElementById(`msg-${messageId}`);
+
     if (!element) {
       conversation.setError(
         "That message is older than what’s loaded. Load older messages first.",
       );
+
       return;
     }
+
     element.scrollIntoView({ block: "center", behavior: "smooth" });
     element.classList.add("is-flash");
     window.setTimeout(() => element.classList.remove("is-flash"), 1400);
@@ -156,6 +161,7 @@ export default function ChatRoom() {
 
   async function copyMessage(message) {
     if (!message.text) return;
+
     try {
       await navigator.clipboard.writeText(message.text);
     } catch {
@@ -165,9 +171,11 @@ export default function ChatRoom() {
 
   const keepPinnedToBottom = useCallback(() => {
     const container = messagesContainerRef.current;
+
     if (container && isAtBottomRef.current) {
       container.scrollTop = container.scrollHeight;
     }
+
   }, [messagesContainerRef, isAtBottomRef]);
   useVisualViewportHeight(keepPinnedToBottom);
 
@@ -175,20 +183,26 @@ export default function ChatRoom() {
   useEffect(() => {
     if (loadingHistory || !conversationId) return;
     if (unreadCapturedForRef.current === conversationId) return;
+
     unreadCapturedForRef.current = conversationId;
+
     const boundary = lastReadAt ? new Date(lastReadAt).getTime() : 0;
+
     const firstUnread = messages.find(
       (message) =>
         String(message.senderId) !== String(userId) &&
         new Date(message.createdAt).getTime() > boundary,
     );
+
     setFirstUnreadId(firstUnread?._id || null);
   }, [loadingHistory, conversationId, lastReadAt, messages, userId]);
 
   // The divider has done its job once the user has had time to read or has replied.
   useEffect(() => {
     if (!firstUnreadId) return undefined;
+
     const timer = setTimeout(() => setFirstUnreadId(null), 5000);
+
     return () => clearTimeout(timer);
   }, [firstUnreadId]);
 
@@ -199,6 +213,7 @@ export default function ChatRoom() {
   useEffect(() => {
     const last = messages[messages.length - 1];
     const key = last?._id || last?.clientMessageId;
+
     if (
       lastMessageKeyRef.current &&
       key &&
@@ -208,25 +223,33 @@ export default function ChatRoom() {
     ) {
       setNewCount((count) => count + 1);
     }
+
     lastMessageKeyRef.current = key || null;
   }, [messages, userId, isAtBottomRef]);
 
   function scrollToLatest() {
     const container = messagesContainerRef.current;
+
     container?.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
     setNewCount(0);
+
     if (conversationId) void markRead(conversationId);
   }
 
   function handleMessagesScroll(event) {
     const container = event.currentTarget;
+
     const distance =
       container.scrollHeight - container.scrollTop - container.clientHeight;
+
     const atBottom = distance < 40;
     setShowJump(distance > 160);
+
     if (atBottom) setNewCount(0);
+
     const reachedBottom = atBottom && !isAtBottomRef.current;
     isAtBottomRef.current = atBottom;
+
     if (
       reachedBottom &&
       document.visibilityState === "visible" &&
@@ -234,6 +257,7 @@ export default function ChatRoom() {
     ) {
       void markRead(conversation.chat.conversationId);
     }
+    
     if (container.scrollTop < 50 && hasMore && !loadingOlder) {
       void loadOlderMessages();
     }
