@@ -24,9 +24,12 @@ export default function useChatSocket({
 }) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [typing, setTyping] = useState(false);
+
   const typingTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
   const remoteTypingTimerRef = useRef(null);
+  const lastTypingSentAtRef = useRef(0);
+
   const conversationId = chat?.conversationId;
   const readOnly = chat?.readOnly;
 
@@ -297,15 +300,29 @@ export default function useChatSocket({
     const value = event.target.value;
     setDraft(value);
 
-    if (!conversationId || readOnly || !socketConnected) return;
+    const socket = socketRef.current;
 
-    if (!typingActiveRef.current) {
-      socketRef.current?.emit("typing:start", { conversationId });
-      typingActiveRef.current = true;
+    if (!conversationId || readOnly || !socketConnected || !socket?.connected) {
+      return;
     }
 
+    if (!value.trim()) {
+      stopTyping();
+      return;
+    }
+
+    const now = Date.now();
+
+    // Send immediately, then refresh at most once per second.
+    if (!typingActiveRef.current || now - lastTypingSentAtRef.current >= 1000) {
+      socket.emit("typing:start", { conversationId });
+      typingActiveRef.current = true;
+      lastTypingSentAtRef.current = now;
+    }
+
+    // Stop showing typing after 1.5 seconds without input.
     window.clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = window.setTimeout(stopTyping, 900);
+    typingTimerRef.current = window.setTimeout(stopTyping, 1500);
   }
 
   return {
