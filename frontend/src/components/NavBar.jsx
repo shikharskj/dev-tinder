@@ -8,6 +8,7 @@ import {
   LogOut,
   UserRound,
   UsersRound,
+  X,
 } from "lucide-react";
 import { useAuth } from "../utils/auth";
 
@@ -159,44 +160,66 @@ export default function NavBar() {
 
       <dialog
         ref={logoutDialogRef}
-        className="modal"
+        className="signout-modal"
         aria-labelledby="logout-title"
         aria-describedby="logout-description"
         onCancel={(event) => {
           if (logoutPendingRef.current) event.preventDefault();
         }}
       >
-        <div className="modal-box logout-dialog" aria-busy={isLoggingOut}>
-          <div className="logout-dialog__icon">
-            <LogOut size={24} aria-hidden="true" />
+        <div className="signout-card" aria-busy={isLoggingOut}>
+          <button
+            type="button"
+            className="signout-close"
+            aria-label="Close confirmation"
+            disabled={isLoggingOut}
+            onClick={() => logoutDialogRef.current?.close()}
+          >
+            <X size={19} aria-hidden="true" />
+          </button>
+
+          <div className="signout-icon" aria-hidden="true">
+            <LogOut size={28} strokeWidth={1.7} />
           </div>
 
-          <h2 id="logout-title" className="mt-4">
-            Sign out?
-          </h2>
+          <span className="signout-eyebrow">UNTIL NEXT TIME</span>
 
-          <p id="logout-description" className="mt-3 text-base-content/70">
-            Are you sure you want to sign out of DevTinder?
+          <h2 id="logout-title">Heading out?</h2>
+
+          <p id="logout-description" className="signout-description">
+            Are you sure you want to sign out?
+            <br />
+            Your next connection will be here when you’re back.
           </p>
 
-          <div className="logout-dialog__actions">
+          <div className="signout-actions">
             <button
               type="button"
-              className="btn btn-ghost"
+              className="signout-button signout-button--cancel"
               autoFocus
               disabled={isLoggingOut}
               onClick={() => logoutDialogRef.current?.close()}
             >
-              Cancel
+              Stay here
             </button>
 
             <button
               type="button"
-              className="btn btn-primary logout-dialog__confirm"
+              className="signout-button signout-button--confirm"
               disabled={isLoggingOut}
               onClick={handleLogout}
             >
-              {isLoggingOut ? "Signing out…" : "Sign out"}
+              {isLoggingOut ? (
+                <>
+                  <span className="signout-spinner" aria-hidden="true" />
+                  Signing out…
+                </>
+              ) : (
+                <>
+                  Sign out
+                  <LogOut size={17} aria-hidden="true" />
+                </>
+              )}
             </button>
           </div>
         </div>
