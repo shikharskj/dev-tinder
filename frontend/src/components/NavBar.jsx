@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Code2,
@@ -44,9 +44,17 @@ export default function NavBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [logoutError, setLogoutError] = useState("");
+  const logoutDialogRef = useRef(null);
+  const logoutPendingRef = useRef(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   async function handleLogout() {
+    if (logoutPendingRef.current) return;
+
+    logoutPendingRef.current = true;
+    setIsLoggingOut(true);
     setLogoutError("");
+
     try {
       await logout();
       navigate("/", { replace: true });
@@ -55,6 +63,10 @@ export default function NavBar() {
         "You were signed out here, but the server could not confirm it.",
       );
       navigate("/", { replace: true });
+    } finally {
+      logoutDialogRef.current?.close();
+      logoutPendingRef.current = false;
+      setIsLoggingOut(false);
     }
   }
 
@@ -123,8 +135,9 @@ export default function NavBar() {
                 <button
                   type="button"
                   className="btn btn-ghost btn-square btn-sm"
-                  onClick={handleLogout}
+                  onClick={() => logoutDialogRef.current?.showModal()}
                   aria-label="Sign out"
+                  aria-haspopup="dialog"
                   title="Sign out"
                 >
                   <LogOut size={19} aria-hidden="true" />
@@ -143,6 +156,51 @@ export default function NavBar() {
           </div>
         </div>
       </header>
+
+      <dialog
+        ref={logoutDialogRef}
+        className="modal"
+        aria-labelledby="logout-title"
+        aria-describedby="logout-description"
+        onCancel={(event) => {
+          if (logoutPendingRef.current) event.preventDefault();
+        }}
+      >
+        <div className="modal-box logout-dialog" aria-busy={isLoggingOut}>
+          <div className="logout-dialog__icon">
+            <LogOut size={24} aria-hidden="true" />
+          </div>
+
+          <h2 id="logout-title" className="mt-4">
+            Sign out?
+          </h2>
+
+          <p id="logout-description" className="mt-3 text-base-content/70">
+            Are you sure you want to sign out of DevTinder?
+          </p>
+
+          <div className="logout-dialog__actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              autoFocus
+              disabled={isLoggingOut}
+              onClick={() => logoutDialogRef.current?.close()}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary logout-dialog__confirm"
+              disabled={isLoggingOut}
+              onClick={handleLogout}
+            >
+              {isLoggingOut ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
+        </div>
+      </dialog>
 
       {logoutError && (
         <div className="toast toast-top toast-center z-50">
