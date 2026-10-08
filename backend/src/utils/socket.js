@@ -56,7 +56,9 @@ const initializeSocket = (server) => {
       credentials: true,
     },
     allowRequest: (request, callback) => {
-      callback(null, allowedOrigins.has(request.headers.origin));
+      const origin = request.headers.origin;
+
+      callback(null, origin === undefined || allowedOrigins.has(origin));
     },
   });
 
@@ -108,9 +110,8 @@ const initializeSocket = (server) => {
     const blocked = new Set(blockedPairs.map(({ pairKey }) => pairKey));
     const lastActiveAt = online
       ? null
-      : (
-          await ChatPresence.findOne({ userId }).select("lastActiveAt").lean()
-        )?.lastActiveAt || new Date();
+      : (await ChatPresence.findOne({ userId }).select("lastActiveAt").lean())
+          ?.lastActiveAt || new Date();
 
     peerIds.forEach((peerId) => {
       const pairKey = [String(userId), String(peerId)].sort().join(":");
