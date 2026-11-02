@@ -1,21 +1,19 @@
-# React + Vite
+# DevTinder — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + Vite + Tailwind CSS 4 / daisyUI client for [DevTinder](https://dev-tinder-community.in/).
 
-Currently, two official plugins are available:
+See the [root README](../README.md) for the full project overview, architecture, and setup.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev      # start Vite dev server
+npm run build    # production build
+npm run lint     # oxlint
+```
 
-## React Compiler
+In development the app calls the API at `http://localhost:7777`; in production it uses `/api`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
-
-# Test payment card details
+## Test payment card details (Razorpay test mode)
 
 - Card: 4718 6091 0820 4366
 - Expiry: 12/29
