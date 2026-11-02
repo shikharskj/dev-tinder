@@ -16,6 +16,10 @@
 ![Razorpay](https://img.shields.io/badge/Razorpay-0C2451?style=flat-square&logo=razorpay&logoColor=white)
 ![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=flat-square&logo=cloudinary&logoColor=white)
 
+### 🌐 Live app: **[dev-tinder-community.in](https://dev-tinder-community.in/)**
+
+<a href="https://dev-tinder-community.in/"><img src="docs/screenshots/landing.jpg" alt="DevTinder landing page" width="85%"></a>
+
 </div>
 
 ---
@@ -35,6 +39,42 @@ It is a **full-stack MERN application running in production** at **[dev-tinder-c
 - 🛡️ Safety tools: block, report, and per-chat privacy settings
 
 > 🎯 **For recruiters:** this project goes past CRUD. It handles real payments, real-time systems, idempotency, race-condition-safe quotas, SSRF protection, and reliable background jobs, which are problems that come up in production software.
+
+---
+
+## 📸 App Preview
+
+> Screenshots from the live app at [dev-tinder-community.in](https://dev-tinder-community.in/). Other members' names are blurred for privacy.
+
+<table>
+  <tr>
+    <td width="50%" align="center"><b>🧭 Discover</b><br/><sub>Profile cards with skills and interests, Pass or Connect, and the daily request allowance</sub></td>
+    <td width="50%" align="center"><b>💳 Basic vs. Elite plans</b><br/><sub>₹199/month Razorpay subscription with plan-based feature gating</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/discover.jpg" alt="Discover feed"></td>
+    <td><img src="docs/screenshots/premium.jpg" alt="Elite subscription plans"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>📥 Connection requests</b><br/><sub>Received and sent tabs, search and filters, accept or reject</sub></td>
+    <td align="center"><b>🤝 Connections</b><br/><sub>Search, skill, location, and gender filters with activity sorting</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/requests.jpg" alt="Connection requests"></td>
+    <td><img src="docs/screenshots/connections.jpg" alt="Connections list"></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><b>💬 Chat on mobile</b><br/><sub>Basic plan's 7-day history window, enforced on the server</sub></td>
+    <td align="center"><b>🛡️ Chat controls</b><br/><sub>Mute, archive, block, report, and privacy settings</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/chat-history.jpg" alt="Mobile chat view" width="260"></td>
+    <td align="center"><img src="docs/screenshots/chat-settings.jpg" alt="Chat settings menu" width="260"></td>
+  </tr>
+</table>
 
 ---
 
